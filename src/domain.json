@@ -1,0 +1,37 @@
+{
+  "REQUEST": {
+    "NEW": "Nueva",
+    "IN_PROGRESS": "En atención",
+    "WAITING_CLIENT": "Esperando cliente",
+    "RESOLVED": "Resuelta",
+    "CLOSED": "Cerrada"
+  },
+  "PRIORITY": {
+    "LOW": "Baja",
+    "MEDIUM": "Media",
+    "HIGH": "Alta",
+    "URGENT": "Urgente"
+  },
+  "LEAVE": {
+    "PENDING": "Pendiente",
+    "APPROVED": "Aprobada",
+    "REJECTED": "Rechazada",
+    "CANCELLED": "Cancelada"
+  },
+  "LABOR": {
+    "ACTIVE": "Activo",
+    "INACTIVE": "Inactivo"
+  },
+  "AVAILABILITY": {
+    "AVAILABLE": "Disponible",
+    "BUSY": "Ocupado",
+    "ABSENT": "Ausente",
+    "ON_LEAVE": "De licencia"
+  },
+  "TASK": {
+    "PENDING": "Pendiente",
+    "IN_PROGRESS": "En curso",
+    "COMPLETED": "Completada",
+    "CANCELLED": "Cancelada"
+  }
+}

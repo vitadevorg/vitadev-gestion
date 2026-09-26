@@ -1,0 +1,67 @@
+{
+  "permissions": [
+    "employees.view",
+    "employees.manage",
+    "clients.view",
+    "clients.manage",
+    "requests.viewAssigned",
+    "requests.viewQueue",
+    "requests.take",
+    "requests.changeStatus",
+    "requests.internalNote",
+    "requests.createTask",
+    "requests.manage",
+    "tasks.viewAssigned",
+    "tasks.updateAssigned",
+    "leaves.viewOwn",
+    "leaves.createOwn",
+    "leaves.manage",
+    "reports.view",
+    "users.view",
+    "users.manage"
+  ],
+  "profiles": {
+    "ADMINISTRATOR": [
+      "employees.view",
+      "employees.manage",
+      "clients.view",
+      "clients.manage",
+      "requests.viewAssigned",
+      "requests.viewQueue",
+      "requests.take",
+      "requests.changeStatus",
+      "requests.internalNote",
+      "requests.createTask",
+      "requests.manage",
+      "tasks.viewAssigned",
+      "tasks.updateAssigned",
+      "leaves.viewOwn",
+      "leaves.createOwn",
+      "leaves.manage",
+      "reports.view",
+      "users.view",
+      "users.manage"
+    ],
+    "SUPPORT": [
+      "requests.viewAssigned",
+      "requests.changeStatus",
+      "requests.internalNote",
+      "requests.createTask",
+      "tasks.viewAssigned",
+      "tasks.updateAssigned",
+      "leaves.viewOwn",
+      "leaves.createOwn"
+    ],
+    "EMPLOYEE": [
+      "tasks.viewAssigned",
+      "tasks.updateAssigned",
+      "leaves.viewOwn",
+      "leaves.createOwn"
+    ]
+  },
+  "profileLabels": {
+    "ADMINISTRATOR": "Administrador",
+    "SUPPORT": "Soporte",
+    "EMPLOYEE": "Empleado"
+  }
+}

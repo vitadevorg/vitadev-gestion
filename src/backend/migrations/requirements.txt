@@ -1,0 +1,2 @@
+# Dependencia de la herramienta de migración, separada del runtime SQLite.
+psycopg[binary]>=3.2,<4

@@ -1,0 +1,176 @@
+[
+  {
+    "id": 1,
+    "name": "Aylen Agüero",
+    "role": "Responsable de operaciones",
+    "area": "Administración",
+    "email": "aylen@example.invalid",
+    "skills": [
+      "Gestión",
+      "SAMSA"
+    ],
+    "photo": "assets/avatars/aylenaguero.png",
+    "firstName": "Aylen",
+    "lastName": "Agüero",
+    "legajo": "VD-001",
+    "dni": "",
+    "birthDate": "",
+    "phone": "",
+    "managerId": null,
+    "hireDate": "2026-09-01",
+    "modality": "Híbrido",
+    "laborStatus": "Activo",
+    "availability": "Disponible",
+    "access": {
+      "enabled": false,
+      "role": "Empleado"
+    },
+    "training": [],
+    "certifications": []
+  },
+  {
+    "id": 2,
+    "name": "Claudio Moya",
+    "role": "Especialista de soporte",
+    "area": "Soporte",
+    "email": "claudio@example.invalid",
+    "skills": [
+      "SAMSA",
+      "Capacitación"
+    ],
+    "photo": "assets/avatars/claudiomoya.png",
+    "firstName": "Claudio",
+    "lastName": "Moya",
+    "legajo": "VD-002",
+    "dni": "",
+    "birthDate": "",
+    "phone": "",
+    "managerId": 1,
+    "hireDate": "2026-09-01",
+    "modality": "Híbrido",
+    "laborStatus": "Activo",
+    "availability": "Disponible",
+    "access": {
+      "enabled": false,
+      "role": "Empleado"
+    },
+    "training": [],
+    "certifications": []
+  },
+  {
+    "id": 3,
+    "name": "Juan Romero",
+    "role": "Desarrollador backend",
+    "area": "Desarrollo",
+    "email": "juan@example.invalid",
+    "skills": [
+      ".NET",
+      "MySQL"
+    ],
+    "photo": "assets/avatars/avatar-juanromero.png",
+    "firstName": "Juan",
+    "lastName": "Romero",
+    "legajo": "VD-003",
+    "dni": "",
+    "birthDate": "",
+    "phone": "",
+    "managerId": 1,
+    "hireDate": "2026-09-01",
+    "modality": "Híbrido",
+    "laborStatus": "Activo",
+    "availability": "Disponible",
+    "access": {
+      "enabled": false,
+      "role": "Empleado"
+    },
+    "training": [],
+    "certifications": []
+  },
+  {
+    "id": 4,
+    "name": "Karen Petriczkowicz",
+    "role": "Ejecutiva de cuentas",
+    "area": "Comercial",
+    "email": "karen@example.invalid",
+    "skills": [
+      "Clientes",
+      "SAMSA"
+    ],
+    "photo": "assets/avatars/karen-petriczkowicz.png",
+    "firstName": "Karen",
+    "lastName": "Petriczkowicz",
+    "legajo": "VD-004",
+    "dni": "",
+    "birthDate": "",
+    "phone": "",
+    "managerId": 1,
+    "hireDate": "2026-09-01",
+    "modality": "Híbrido",
+    "laborStatus": "Activo",
+    "availability": "Disponible",
+    "access": {
+      "enabled": false,
+      "role": "Empleado"
+    },
+    "training": [],
+    "certifications": []
+  },
+  {
+    "id": 5,
+    "name": "Gabriel Lazarte",
+    "role": "Desarrollador backend",
+    "area": "Desarrollo",
+    "email": "gabriel@example.invalid",
+    "skills": [
+      ".NET",
+      "MySQL"
+    ],
+    "photo": "assets/avatars/lazartegabriel.png",
+    "firstName": "Gabriel",
+    "lastName": "Lazarte",
+    "legajo": "VD-005",
+    "dni": "",
+    "birthDate": "",
+    "phone": "",
+    "managerId": 1,
+    "hireDate": "2026-09-01",
+    "modality": "Híbrido",
+    "laborStatus": "Activo",
+    "availability": "Disponible",
+    "access": {
+      "enabled": false,
+      "role": "Empleado"
+    },
+    "training": [],
+    "certifications": []
+  },
+  {
+    "id": 6,
+    "name": "Ramiro Vides",
+    "role": "Desarrollador backend",
+    "area": "Desarrollo",
+    "email": "ramiro@example.invalid",
+    "skills": [
+      ".NET",
+      "MySQL"
+    ],
+    "photo": "assets/avatars/ramirovides.png",
+    "firstName": "Ramiro",
+    "lastName": "Vides",
+    "legajo": "VD-006",
+    "dni": "",
+    "birthDate": "",
+    "phone": "",
+    "managerId": 1,
+    "hireDate": "2026-09-01",
+    "modality": "Híbrido",
+    "laborStatus": "Activo",
+    "availability": "Disponible",
+    "access": {
+      "enabled": false,
+      "role": "Empleado"
+    },
+    "training": [],
+    "certifications": []
+  }
+]

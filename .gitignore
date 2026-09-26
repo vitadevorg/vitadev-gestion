@@ -1,0 +1,9 @@
+work/
+outputs/
+.sites-runtime/
+
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
