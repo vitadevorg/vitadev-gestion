@@ -1,1 +1,210 @@
-.rp{max-width:1400px}.rp-filter{display:flex;flex-wrap:wrap;gap:12px;align-items:end;padding:18px;background:var(--panel,#fff);border:1px solid #dfe5ee;border-radius:10px}.rp-filter label{display:grid;gap:6px;font-size:12px;font-weight:600;flex:1 1 140px}.rp-filter input,.rp-filter select{width:100%;min-width:0;padding:10px;border:1px solid #cbd5e1;border-radius:6px;background:var(--panel,#fff);color:inherit;font:inherit}.rp-scope{font-size:12px;color:#64748b;margin:20px 0}.rp-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid #dfe5ee;border-radius:10px;background:var(--panel,#fff);margin:16px 0}.rp-kpis section{padding:22px;border-right:1px solid #e2e8f0}.rp-kpis section:last-child{border:0}.rp-kpis h2{font-size:12px;color:#64748b;font-weight:600;margin:0 0 14px}.rp-kpis strong{font-size:30px;letter-spacing:-1px}.rp-kpis p{font-size:11px;color:#64748b;margin:10px 0 0}.rp-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}.rp-section{padding:24px 0;border-bottom:1px solid #dfe5ee;min-width:0}.rp-section h2{font-size:16px;margin:0 0 14px}.rp-empty{color:#64748b;font-size:13px;padding:20px 0}.rp-rows{margin:0}.rp-rows>div{display:flex;justify-content:space-between;gap:20px;padding:12px 0;border-bottom:1px solid #e9edf3;font-size:13px}.rp-rows dd{font-weight:600;margin:0}.rp-bars>div{display:grid;grid-template-columns:1fr auto;gap:9px;margin:18px 0;font-size:13px}.rp-bars meter{grid-column:1/-1;width:100%;height:12px}.rp-bars meter::-webkit-meter-bar{background:#e8edf5;border:0}.rp-bars meter::-webkit-meter-optimum-value{background:#2865c7}.rp-bars small{font-weight:400;color:#64748b}.rp-chart{display:block;width:100%;max-height:290px}.rp-chart text{font:10px sans-serif;fill:#64748b}.rp-alert{width:100%;display:flex;justify-content:space-between;gap:12px;text-align:left;padding:16px 0;border:0;border-bottom:1px solid #e2e8f0;background:transparent;color:inherit;cursor:pointer}.rp-alert b{color:#2865c7}.rp-method{font-size:12px;color:#64748b;margin:24px 0}.rp summary{cursor:pointer;padding:8px 0}.rp-error{color:#b42318}.rp button:disabled{opacity:.5;cursor:not-allowed}.rp :focus-visible,.rp-drill :focus-visible{outline:3px solid #3b82f6;outline-offset:3px}.rp-drill{max-width:640px;width:90%;border:1px solid #dfe5ee;border-radius:12px;padding:28px}.rp-drill button{margin:6px}.rp-drill::backdrop{background:#13223a66}@media(max-width:800px){.rp-kpis{grid-template-columns:1fr 1fr}.rp-grid{grid-template-columns:1fr}.rp-kpis section{padding:16px}.rp-kpis strong{font-size:25px}}@media(max-width:420px){.rp-filter{padding:12px}.rp-filter label{flex-basis:120px}.rp-kpis h2{min-height:30px}.rp-scope{overflow-wrap:anywhere}}
+.rp {
+  max-width: 1400px;
+}
+.rp-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  padding: 18px;
+  background: var(--panel, #fff);
+  border: 1px solid #dfe5ee;
+  border-radius: 10px;
+}
+.rp-filter label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  flex: 1 1 140px;
+}
+.rp-filter input,
+.rp-filter select {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: var(--panel, #fff);
+  color: inherit;
+  font: inherit;
+}
+.rp-scope {
+  font-size: 12px;
+  color: #64748b;
+  margin: 20px 0;
+}
+.rp-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid #dfe5ee;
+  border-radius: 10px;
+  background: var(--panel, #fff);
+  margin: 16px 0;
+}
+.rp-kpis section {
+  padding: 22px;
+  border-right: 1px solid #e2e8f0;
+}
+.rp-kpis section:last-child {
+  border: 0;
+}
+.rp-kpis h2 {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+  margin: 0 0 14px;
+}
+.rp-kpis strong {
+  font-size: 30px;
+  letter-spacing: -1px;
+}
+.rp-kpis p {
+  font-size: 11px;
+  color: #64748b;
+  margin: 10px 0 0;
+}
+.rp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 24px;
+}
+.rp-section {
+  padding: 24px 0;
+  border-bottom: 1px solid #dfe5ee;
+  min-width: 0;
+}
+.rp-section h2 {
+  font-size: 16px;
+  margin: 0 0 14px;
+}
+.rp-empty {
+  color: #64748b;
+  font-size: 13px;
+  padding: 20px 0;
+}
+.rp-rows {
+  margin: 0;
+}
+.rp-rows > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 0;
+  border-bottom: 1px solid #e9edf3;
+  font-size: 13px;
+}
+.rp-rows dd {
+  font-weight: 600;
+  margin: 0;
+}
+.rp-bars > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 9px;
+  margin: 18px 0;
+  font-size: 13px;
+}
+.rp-bars meter {
+  grid-column: 1/-1;
+  width: 100%;
+  height: 12px;
+}
+.rp-bars meter::-webkit-meter-bar {
+  background: #e8edf5;
+  border: 0;
+}
+.rp-bars meter::-webkit-meter-optimum-value {
+  background: #2865c7;
+}
+.rp-bars small {
+  font-weight: 400;
+  color: #64748b;
+}
+.rp-chart {
+  display: block;
+  width: 100%;
+  max-height: 290px;
+}
+.rp-chart text {
+  font: 10px sans-serif;
+  fill: #64748b;
+}
+.rp-alert {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  padding: 16px 0;
+  border: 0;
+  border-bottom: 1px solid #e2e8f0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.rp-alert b {
+  color: #2865c7;
+}
+.rp-method {
+  font-size: 12px;
+  color: #64748b;
+  margin: 24px 0;
+}
+.rp summary {
+  cursor: pointer;
+  padding: 8px 0;
+}
+.rp-error {
+  color: #b42318;
+}
+.rp button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.rp :focus-visible,
+.rp-drill :focus-visible {
+  outline: 3px solid #3b82f6;
+  outline-offset: 3px;
+}
+.rp-drill {
+  max-width: 640px;
+  width: 90%;
+  border: 1px solid #dfe5ee;
+  border-radius: 12px;
+  padding: 28px;
+}
+.rp-drill button {
+  margin: 6px;
+}
+.rp-drill::backdrop {
+  background: #13223a66;
+}
+@media (max-width: 800px) {
+  .rp-kpis {
+    grid-template-columns: 1fr 1fr;
+  }
+  .rp-grid {
+    grid-template-columns: 1fr;
+  }
+  .rp-kpis section {
+    padding: 16px;
+  }
+  .rp-kpis strong {
+    font-size: 25px;
+  }
+}
+@media (max-width: 420px) {
+  .rp-filter {
+    padding: 12px;
+  }
+  .rp-filter label {
+    flex-basis: 120px;
+  }
+  .rp-kpis h2 {
+    min-height: 30px;
+  }
+  .rp-scope {
+    overflow-wrap: anywhere;
+  }
+}

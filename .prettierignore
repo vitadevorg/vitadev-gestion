@@ -1,0 +1,6 @@
+dist/
+work/
+.venv/
+certificados/
+# Generado por build.js desde domain.json; el build lo reescribe.
+src/domain.js

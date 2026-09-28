@@ -1,6 +1,3 @@
 @echo off
-cd /d "%~dp0"
-node build.js
-if errorlevel 1 exit /b 1
-python src/backend/auth_server.py
-pause
+rem Alias historico: la documentacion anterior lo menciona. Usar iniciar-vitadev.cmd.
+call "%~dp0iniciar-vitadev.cmd"

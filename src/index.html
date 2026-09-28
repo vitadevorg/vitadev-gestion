@@ -1,1 +1,55 @@
-<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VitaDev · Tu equipo, conectado</title><meta name="description" content="Espacio de gestión de empleados, clientes y atención de VitaDev."><link rel="icon" type="image/png" href="assets/brand/favicon.png"><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="team.css"><link rel="stylesheet" href="crm.css"><link rel="stylesheet" href="helpdesk.css"><link rel="stylesheet" href="leave.css"><link rel="stylesheet" href="reports.css"><link rel="stylesheet" href="auth.css"></head><body class="auth-locked"><div id="auth-root" role="region" aria-label="Acceso a VitaDev"><p class="auth-loading" role="status"><img src="assets/brand/vitadev-icon.png" width="32" height="32" alt="">Cargando VitaDev…</p></div><aside id="sidebar"></aside><div class="shell"><header><button class="icon mobile" id="menu" aria-label="Abrir menú">☰</button><div class="breadcrumb">Workspace <span>/</span> <b id="crumb">Resumen</b></div><button id="searchButton" class="search-button">⌕ <span>Buscar en VitaDev</span><kbd>Ctrl K</kbd></button><button class="icon" id="theme" aria-label="Cambiar tema">◐</button><button class="avatar" id="profile" aria-label="Ver mi perfil"><img class="real-avatar" src="assets/avatars/default-avatar.png" alt="Perfil" width="40" height="40" data-image-fallback="assets/avatars/default-avatar.png"></button></header><main id="app"></main><footer>VitaDev <span>Sesión autenticada · Registros persistentes</span></footer></div><dialog id="modal"><div id="modalContent"></div></dialog><div id="toast" role="status" aria-live="polite" aria-atomic="true"></div><script src="assets.js"></script><script src="domain.js"></script><script src="auth.js"></script></body></html>
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>VitaDev · Tu equipo, conectado</title>
+    <meta
+      name="description"
+      content="Espacio de gestión de empleados, clientes y atención de VitaDev."
+    />
+    <link rel="icon" type="image/png" href="assets/brand/favicon.png" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="theme.css" />
+    <link rel="stylesheet" href="team.css" />
+    <link rel="stylesheet" href="crm.css" />
+    <link rel="stylesheet" href="helpdesk.css" />
+    <link rel="stylesheet" href="leave.css" />
+    <link rel="stylesheet" href="reports.css" />
+    <link rel="stylesheet" href="auth.css" />
+  </head>
+  <body class="auth-locked">
+    <div id="auth-root" role="region" aria-label="Acceso a VitaDev">
+      <p class="auth-loading" role="status">
+        <img src="assets/brand/vitadev-icon.png" width="32" height="32" alt="" />Cargando VitaDev…
+      </p>
+    </div>
+    <aside id="sidebar"></aside>
+    <div class="shell">
+      <header>
+        <button class="icon mobile" id="menu" aria-label="Abrir menú">☰</button>
+        <div class="breadcrumb">Workspace <span>/</span> <b id="crumb">Resumen</b></div>
+        <button id="searchButton" class="search-button">
+          ⌕ <span>Buscar en VitaDev</span><kbd>Ctrl K</kbd></button
+        ><button class="icon" id="theme" aria-label="Cambiar tema">◐</button
+        ><button class="avatar" id="profile" aria-label="Ver mi perfil">
+          <img
+            class="real-avatar"
+            src="assets/avatars/default-avatar.png"
+            alt="Perfil"
+            width="40"
+            height="40"
+            data-image-fallback="assets/avatars/default-avatar.png"
+          />
+        </button>
+      </header>
+      <main id="app"></main>
+      <footer>VitaDev <span>Sesión autenticada · Registros persistentes</span></footer>
+    </div>
+    <dialog id="modal"><div id="modalContent"></div></dialog>
+    <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+    <script src="assets.js"></script>
+    <script src="domain.js"></script>
+    <script src="auth.js"></script>
+  </body>
+</html>

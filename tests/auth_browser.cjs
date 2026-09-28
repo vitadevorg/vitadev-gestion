@@ -1,4 +1,52 @@
-const credentials=role=>({email:role==='admin'?'admin@test.invalid':role==='support'?'support@test.invalid':'employee@test.invalid',password:'Nexo-test-password-2026'});
-async function login(page,base,role='admin'){const response=await page.request.post(base+'/api/auth/login',{data:credentials(role),headers:{'X-Nexo-Client':'team'},timeout:60000});if(!response.ok())throw Error(await response.text());await page.goto(base+'/inicio');await page.waitForFunction(()=>typeof authLoaded!=='undefined'&&authLoaded)}
-function apiFactory(base){const sessions={};return async function api(route,data,role='admin'){if(!sessions[role]){const r=await fetch(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json','X-Nexo-Client':'team'},body:JSON.stringify(credentials(role))});const d=await r.json();if(!r.ok)throw Error(JSON.stringify(d));sessions[role]={cookie:r.headers.get('set-cookie').split(';')[0],csrf:d.user.csrfToken}}const a=sessions[role],r=await fetch(base+route,{method:data?'POST':'GET',headers:{'Content-Type':'application/json','X-Nexo-Client':'team','X-CSRF-Token':a.csrf,Cookie:a.cookie},body:data?JSON.stringify(data):undefined});const d=await r.json();if(!r.ok)throw Error(JSON.stringify(d));return d}}
-module.exports={login,apiFactory};
+const credentials = (role) => ({
+  email:
+    role === 'admin'
+      ? 'admin@test.invalid'
+      : role === 'support'
+        ? 'support@test.invalid'
+        : 'employee@test.invalid',
+  password: 'Nexo-test-password-2026',
+});
+async function login(page, base, role = 'admin') {
+  const response = await page.request.post(base + '/api/auth/login', {
+    data: credentials(role),
+    headers: { 'X-Nexo-Client': 'team' },
+    timeout: 60000,
+  });
+  if (!response.ok()) throw Error(await response.text());
+  await page.goto(base + '/inicio');
+  await page.waitForFunction(() => typeof authLoaded !== 'undefined' && authLoaded);
+}
+function apiFactory(base) {
+  const sessions = {};
+  return async function api(route, data, role = 'admin') {
+    if (!sessions[role]) {
+      const r = await fetch(base + '/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Nexo-Client': 'team' },
+        body: JSON.stringify(credentials(role)),
+      });
+      const d = await r.json();
+      if (!r.ok) throw Error(JSON.stringify(d));
+      sessions[role] = {
+        cookie: r.headers.get('set-cookie').split(';')[0],
+        csrf: d.user.csrfToken,
+      };
+    }
+    const a = sessions[role],
+      r = await fetch(base + route, {
+        method: data ? 'POST' : 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Nexo-Client': 'team',
+          'X-CSRF-Token': a.csrf,
+          Cookie: a.cookie,
+        },
+        body: data ? JSON.stringify(data) : undefined,
+      });
+    const d = await r.json();
+    if (!r.ok) throw Error(JSON.stringify(d));
+    return d;
+  };
+}
+module.exports = { login, apiFactory };
