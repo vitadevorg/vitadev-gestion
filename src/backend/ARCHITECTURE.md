@@ -35,3 +35,15 @@ Pendiente: autenticación real, sesiones, permisos en cada endpoint, vinculació
 Build y suites API de Equipo, Clientes, Solicitudes, Licencias, Reportes y estabilidad, incluidas las copias existentes en work. Pruebas de navegador de CRUD, asignación, estados, comentarios, adjuntos, tareas, licencias, filtros, PDF y responsive.
 
 La integración verifica la tarea de Lucas en ambas vistas, la licencia asociada a su ID, aprobación persistida, estado laboral Activo con disponibilidad De licencia y resolución contabilizada en Reportes. Las pruebas usan bases aisladas.
+
+## Portal Cliente (pendiente)
+El frontend conserva un esqueleto inactivo del Portal Cliente: ramas `state.role === 'client'` en app.js, employee.js, helpdesk.js, interface.js y leave.js. Hoy nunca se ejecutan: app.js asigna solo `admin` o `employee` a partir de la sesión, y el backend no permite crear cuentas CLIENT. Se conservan como referencia de las vistas previstas: encabezado institucional, solicitudes de la institución, alta de solicitudes y ocultamiento de notas internas y licencias.
+
+No es una base segura. Todas las ramas suponen que el cliente es el registro con id 1 (Sanatorio 9 de Julio). Los puntos con ese valor fijo están marcados con `PORTAL-CLIENTE` y se ubican con `grep -rn "PORTAL-CLIENTE" src`.
+
+Antes de activarlo:
+- Backend: agregar el rol CLIENT y un perfil de permisos propio en access-policy.json, y vincular la cuenta con su institución mediante un campo `clientId` en users. PostgreSQL requiere una migración: la restricción de roles solo admite ADMIN y EMPLOYEE.
+- Autorización: filtrar en auth.authorize y filter_response por el `clientId` de la sesión. Solicitudes, archivos y datos de CRM se limitan a la propia institución; comentarios internos, eventos, tareas, contratos, Equipo, Licencias y Reportes quedan sin acceso.
+- Creación de solicitudes: el servidor fija `clientId` desde la sesión y valida que contacto y contratación pertenezcan a esa institución, sin confiar en el valor enviado.
+- Frontend: calcular `state.role = 'client'` desde la sesión y reemplazar cada `1` marcado por el cliente de la sesión.
+- Pruebas: una cuenta cliente no puede ver solicitudes, archivos ni contactos de otra institución, aunque manipule IDs o encabezados.

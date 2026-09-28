@@ -1,44 +1,686 @@
 /* Solicitudes pertenecen a Mesa de Ayuda; sus tareas tienen responsables independientes. */
-const desk={loaded:false,error:'',data:{requests:[],events:[],comments:[],tasks:[],files:[]},view:'list',id:null,mode:'table',query:'',status:'',priority:'',draft:null,errors:{},touched:new Set(),busy:false,commentText:'',commentFiles:[],allActivity:false,agentQuery:'',selectedAgent:null};
-const hd=id=>desk.data.requests.find(r=>r.id===Number(id));
-const hdEditable=()=>can('requests.changeStatus');
-const hdCanView=r=>state.role==='admin'||(state.role==='client'?r.clientId===1:r.agentId===currentEmployeeId()&&employeePermission('support')||desk.data.tasks.some(t=>t.ticket===r.id&&t.owner===currentEmployeeId()));
-const hdBtn=(label,op,id='',primary=false)=>`<button type="button" class="button ${primary?'primary':''}" data-desk="${op}" data-id="${id}">${label}</button>`;
-const hdProduct=r=>crProduct(crm.data.subscriptions.find(s=>s.id===r.subscriptionId)?.productId)?.name||'Producto no disponible';
-const hdAgent=id=>id?crPerson(id):'<span class="sub">Sin asignar</span>';
-const hdOpen=r=>![REQUEST.RESOLVED,REQUEST.CLOSED].includes(r.status);
-const hdStamp=value=>new Intl.DateTimeFormat('es-AR',{dateStyle:'short',timeStyle:'short',hour12:false}).format(new Date(value));
-function hdWhen(value){const d=new Date(value),today=new Date(),yesterday=new Date();yesterday.setDate(today.getDate()-1);const time=d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false});return d.toDateString()===today.toDateString()?'Hoy, '+time:d.toDateString()===yesterday.toDateString()?'Ayer, '+time:d.toLocaleDateString('es-AR')}
-function hdBadge(value){return `<span class="desk-badge ${value===PRIORITY.URGENT?'desk-urgent':value===PRIORITY.HIGH?'desk-high':''}">${esc(value)}</span>`}
-async function hdApi(path='',data){const response=await fetch('/api/desk'+path,{method:data===undefined?'GET':'POST',headers:{'X-Nexo-View':state.role,'X-Nexo-Employee':String(currentEmployeeId()),...(data===undefined?{}:{'Content-Type':'application/json','X-Nexo-Client':'team'})},body:data===undefined?undefined:JSON.stringify(data),cache:'no-store'});let result;try{result=await response.json()}catch{throw {errors:{_form:'Mesa de Ayuda no está disponible. Conservamos los datos ingresados.'}}}if(!response.ok){result.status=response.status;throw result}return result}
-async function hdLoad(draw=true){try{const data=await hdApi();desk.data=data;desk.loaded=true;desk.error='';tickets=data.requests;}catch(e){desk.error=Object.values(e.errors||{_form:'No se pudo cargar Mesa de Ayuda.'}).join(' ')}if(draw)render();document.dispatchEvent(new Event('nexo:data-changed'));return !desk.error}
-function hdList(){let list=desk.data.requests.filter(r=>hdCanView(r)&&(!desk.status||r.status===desk.status)&&(!desk.priority||r.priority===desk.priority)&&['SOL-'+r.id,'#'+r.id,r.title,cr(r.clientId)?.name].join(' ').toLowerCase().includes(desk.query.toLowerCase())).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));return heading('Solicitudes','Mesa de Ayuda · Necesidades de los clientes y seguimiento de atención.',(can('requests.manage')?hdBtn('+ Nueva solicitud','new','',true):''))+`<div class="desk-toolbar"><label>Buscar solicitud<input id="desk-query" type="search" value="${esc(desk.query)}" placeholder="ID, título o cliente"></label><label>Estado<select data-desk-filter="status"><option value="">Todos los estados</option>${desk.data.states.map(s=>`<option ${s===desk.status?'selected':''}>${s}</option>`).join('')}</select></label><label>Prioridad<select data-desk-filter="priority"><option value="">Todas las prioridades</option>${desk.data.priorities.map(s=>`<option ${s===desk.priority?'selected':''}>${s}</option>`).join('')}</select></label>${hdBtn('Limpiar','clear')}<div class="desk-switch" role="group" aria-label="Presentación"><button data-desk="table" aria-pressed="${desk.mode==='table'}">Tabla</button><button data-desk="board" aria-pressed="${desk.mode==='board'}">Tablero</button></div></div><p class="desk-count">${list.length} solicitudes${desk.status?' · '+esc(desk.status):''}</p>${!list.length?visualState(desk.data.requests.some(hdCanView)?'results':'requests',desk.data.requests.some(hdCanView)?hdBtn('Limpiar filtros','clear'):''):desk.mode==='table'?`<section class="panel table-panel">${crTable(['Solicitud','Cliente','Producto / servicio','Prioridad','Estado','Agente','Actualización','Acciones'],list.map(r=>`<tr><td><button class="desk-title-link" data-desk="detail" data-id="${r.id}"><small>SOL-${r.id}</small><strong>${esc(r.title)}</strong></button></td><td><div class="person">${personImage(cr(r.clientId),'small','company')}<span>${esc(cr(r.clientId)?.name)}</span></div></td><td>${esc(hdProduct(r))}</td><td>${hdBadge(r.priority)}</td><td>${hdBadge(r.status)}</td><td>${hdAgent(r.agentId)}</td><td><time datetime="${r.updatedAt}">${hdWhen(r.updatedAt)}</time></td><td>${hdBtn('Ver detalle','detail',r.id)}</td></tr>`))}</section>`:`<div class="desk-board">${desk.data.states.map(s=>`<section class="desk-column"><h2>${s}<span>${list.filter(r=>r.status===s).length}</span></h2>${list.filter(r=>r.status===s).map(r=>`<button class="desk-board-item" data-desk="detail" data-id="${r.id}"><small>SOL-${r.id} · ${esc(hdProduct(r))}</small><strong>${esc(r.title)}</strong><span>${esc(cr(r.clientId)?.name)}</span><div>${hdBadge(r.priority)}${r.agentId?personImage(crEmployee(r.agentId)):'<small>Sin asignar</small>'}</div></button>`).join('')||'<p class="sub">Sin solicitudes</p>'}</section>`).join('')}</div>`}`}
-function hdFile(path){const f=desk.data.files.find(f=>path.endsWith(f.id));return `<a href="${esc(path)}?download=1" class="desk-file" download>${ico('file')} ${esc(f?.name||'Archivo adjunto')}</a>`}
-function hdActivity(r){const list=desk.data.events.filter(e=>e.request_id===r.id);return `<div class="desk-section-head"><h2>${desk.allActivity?'Actividad completa':'Actividad reciente'}</h2>${list.length>3?hdBtn(desk.allActivity?'Ver menos':'Ver actividad completa','activity'):''}</div><ol class="desk-activity">${(desk.allActivity?list:list.slice(0,3)).map(e=>`<li><time datetime="${e.created_at}">${hdWhen(e.created_at)}</time><div><strong>${esc(e.action)}</strong><p>${e.reference.startsWith('/api/desk/files/')?hdFile(e.reference):esc(e.reference)}</p><small>${esc(e.actor)}</small></div></li>`).join('')}</ol>`}
-function hdDetail(){const r=hd(desk.id);if(!r||!hdCanView(r))return crEmpty('Solicitud no disponible.');const contact=crm.data.contacts.find(c=>c.id===r.contactId),tasks=desk.data.tasks.filter(t=>t.ticket===r.id),internal=state.role!=='client';return `${hdBtn('← Volver a Solicitudes','list')}<div class="desk-detail-head"><div><p class="eyebrow">SOL-${r.id}</p><h1>${esc(r.title)}</h1><div class="desk-client-line">${personImage(cr(r.clientId),'small','company')}<span>${esc(cr(r.clientId)?.name)}</span><span class="sub">${esc(hdProduct(r))}</span></div><div class="desk-badges">${hdBadge(r.type)}${hdBadge(r.priority)}${hdBadge(r.status)}</div></div>${hdEditable()?`<div class="desk-detail-controls"><label>Estado<select id="desk-state"><option>${r.status}</option>${desk.data.transitions[r.status].map(s=>`<option>${s}</option>`).join('')}</select></label><label>Prioridad<select id="desk-priority" ${!can('requests.manage')?'disabled':''}>${desk.data.priorities.map(p=>`<option ${p===r.priority?'selected':''}>${p}</option>`).join('')}</select></label><p id="desk-update-error" class="field-error" role="alert"></p></div>`:''}</div><div class="desk-detail-grid"><article class="desk-main"><section><h2>Descripción</h2><p class="desk-description">${esc(r.description)}</p>${r.attachments.length?`<div class="desk-files">${r.attachments.map(hdFile).join('')}</div>`:''}</section>${internal?`<section><div class="desk-section-head"><h2>Comentarios internos</h2></div>${desk.data.comments.filter(c=>c.request_id===r.id).map(c=>`<div class="desk-comment">${personImage({name:c.actor})}<div><strong>${esc(c.actor)}</strong><time>${hdStamp(c.created_at)}</time><p>${esc(c.text)}</p><div class="desk-files">${c.attachments.map(hdFile).join('')}</div></div></div>`).join('')||'<p class="sub">Todavía no hay comentarios internos.</p>'}${hdEditable()?`<form id="desk-comment-form" novalidate><label for="desk-comment">Comentario interno</label><textarea id="desk-comment" rows="3" maxlength="10000" placeholder="Registrá el análisis o la información necesaria…" aria-describedby="desk-comment-error">${esc(desk.commentText)}</textarea><div id="desk-comment-files" class="desk-files">${desk.commentFiles.map((f,i)=>hdFile(f)+hdBtn('Quitar','remove-comment-file',i)).join('')}</div><small id="desk-comment-error" class="field-error" role="alert"></small><div class="desk-comment-actions"><label class="button desk-upload">Adjuntar<input type="file" data-desk-upload="comment" multiple accept=".png,.jpg,.jpeg,.webp,.pdf,.docx,.xlsx,.txt,.log,.csv"></label><button class="button primary" id="desk-comment-submit" type="submit" ${!desk.commentText.trim()||desk.busy?'disabled':''}>Comentar</button></div><small class="sub">Hasta 10 archivos de 10 MB. Imágenes, PDF, documentos y logs.</small></form>`:''}</section>`:''}</article><div class="desk-context"><section><h2>Información</h2><dl><dt>Reportado por</dt><dd>${contact?`${esc(contact.firstName+' '+contact.lastName)}<small>${esc(contact.position)}</small>`:'Contacto no registrado en la importación'}</dd><dt>Creada</dt><dd>${hdStamp(r.createdAt)}</dd><dt>Última actualización</dt><dd>${hdStamp(r.updatedAt)}</dd></dl></section><section><h2>Atención</h2><dl><dt>Cola</dt><dd>Mesa de Ayuda</dd><dt>Agente asignado</dt><dd>${hdAgent(r.agentId)}${r.agentId?`<small>${esc(crEmployee(r.agentId)?.role)}</small>`:''}</dd></dl>${can('requests.manage')?hdBtn('Cambiar','assign'):''}</section>${internal&&tasks.length?`<section><div class="desk-section-head"><h2>Trabajo vinculado</h2><span class="sub">${tasks.length} tareas</span></div>${tasks.map(t=>`<div class="desk-task"><small>TAR-${String(t.id).padStart(3,'0')}</small><strong>${esc(t.title)}</strong>${state.role==='admin'||t.owner===currentEmployeeId()?`<label><input type="checkbox" data-task="${t.id}" ${t.done?'checked':''}> Completada</label>`:''}<p>${esc(t.status)} · ${esc(crEmployee(t.owner)?.name||'Sin responsable')}</p>${t.due?`<small>Vence: ${crDate(t.due)}</small>`:''}</div>`).join('')}${hdEditable()?hdBtn('+ Crear tarea','task'):''}</section>`:''}${internal&&!tasks.length&&hdEditable()?`<div class="desk-create-task">${hdBtn('+ Crear tarea interna','task')}</div>`:''}</div></div>${internal?`<section class="desk-history">${hdActivity(r)}</section>`:''}`}
-function hdNewErrors(){const d=desk.draft,errors={};if(!d)return errors;for(const key of ['clientId','contactId','subscriptionId','type','title','description','priority'])if(!String(d[key]||'').trim())errors[key]='Este campo es obligatorio.';if(d.title.length>180)errors.title='Usá hasta 180 caracteres.';if(d.description.length>10000)errors.description='Usá hasta 10.000 caracteres.';return {...errors,...desk.errors}}
-function hdField(key,label,options){const d=desk.draft;return `<label class="desk-field" for="df-${key}">${label} *<select id="df-${key}" data-desk-field="${key}" required aria-describedby="df-${key}-error"><option value="">Seleccionar ${label.toLowerCase()}</option>${options.map(x=>{const [v,l]=Array.isArray(x)?x:[x,x];return `<option value="${esc(v)}" ${String(v)===String(d[key])?'selected':''}>${esc(l)}</option>`}).join('')}</select><small id="df-${key}-error" class="field-error"></small></label>`}
-function hdNew(){const d=desk.draft,contacts=crRelated('contacts',d.clientId).filter(c=>c.status===LABOR.ACTIVE),subs=crRelated('subscriptions',d.clientId).filter(s=>s.status!=='Finalizado');return hdBtn('← Volver a Solicitudes','cancel-new')+heading('Nueva solicitud','Se registrará en Mesa de Ayuda, con estado Nueva y sin agente asignado.')+`<form id="desk-new-form" class="desk-new-form" novalidate><div class="desk-form-grid">${hdField('clientId','Cliente',crm.data.clients.filter(c=>!['Prospecto','Finalizado'].includes(c.status)&&(state.role!=='client'||c.id===1)).map(c=>[c.id,c.name]))}${hdField('contactId','Contacto',contacts.map(c=>[c.id,c.firstName+' '+c.lastName]))}${hdField('subscriptionId','Producto / servicio',subs.map(s=>[s.id,crProduct(s.productId)?.name+(s.plan?' · '+s.plan:'')]))}${hdField('type','Tipo',desk.data.types)}${d.clientId&&(!contacts.length||!subs.length)?`<p class="desk-form-wide desk-note">${!contacts.length?'Este cliente necesita un contacto activo. ':''}${!subs.length?'Este cliente necesita un producto o servicio contratado. ':''}${hdEditable()?`<button type="button" class="link" data-desk="client-setup">Abrir ficha del cliente</button>`:''}</p>`:''}<label class="desk-field desk-form-wide" for="df-title">Título *<input id="df-title" data-desk-field="title" required maxlength="180" value="${esc(d.title)}" aria-describedby="df-title-error"><small id="df-title-error" class="field-error"></small></label><label class="desk-field desk-form-wide" for="df-description">Descripción *<textarea id="df-description" data-desk-field="description" rows="4" required maxlength="10000" aria-describedby="df-description-error">${esc(d.description)}</textarea><small id="df-description-error" class="field-error"></small></label>${hdField('priority','Prioridad',desk.data.priorities)}<div class="desk-field"><label for="df-files">Adjuntos</label><input id="df-files" type="file" data-desk-upload="new" multiple accept=".png,.jpg,.jpeg,.webp,.pdf,.docx,.xlsx,.txt,.log,.csv"><small>Hasta 10 archivos de 10 MB.</small><div class="desk-files">${d.attachments.map((f,i)=>hdFile(f)+hdBtn('Quitar','remove-new-file',i)).join('')}</div><small id="df-attachments-error" class="field-error"></small></div></div><p id="desk-form-error" class="field-error" role="alert"></p><div class="desk-new-footer"><span id="desk-save-hint" role="status"></span><div class="crm-actions">${hdBtn('Cancelar','cancel-new')}<button class="button primary" id="desk-create" type="submit">Crear solicitud</button></div></div></form>`}
-function hdErrors(){if(!desk.draft)return;const errors=hdNewErrors();Object.keys({...desk.draft,...errors}).forEach(k=>{const el=document.getElementById('df-'+k),msg=document.getElementById('df-'+k+'-error');if(msg)msg.textContent=desk.touched.has(k)?errors[k]||'':'';el?.setAttribute('aria-invalid',String(desk.touched.has(k)&&!!errors[k]))});if($('#desk-create')){$('#desk-create').disabled=desk.busy||Object.keys(errors).length>0;$('#desk-create').textContent=desk.busy?'Creando…':'Crear solicitud';$('#desk-save-hint').textContent=desk.busy?'Procesando…':Object.keys(errors).length?'Completá los campos obligatorios.':'Mesa de Ayuda · Sin asignar';$('#desk-form-error').textContent=errors._form||''}}
-function hdShow(id){desk.id=Number(id);desk.view='detail';desk.allActivity=false;desk.commentText='';desk.commentFiles=[];state.page='support';render();window.scrollTo(0,0)}
-support=function(){return `<div class="desk-module">${!desk.loaded||!crm.loaded?heading('Solicitudes','Mesa de Ayuda')+`${desk.error||crm.error?visualState('error',hdBtn('Reintentar','retry')):'<p role="status">Cargando solicitudes…</p>'}`:desk.view==='new'?hdNew():desk.view==='detail'?hdDetail():hdList()}</div>`};
-const beforeDeskDetail=ticketDetail;ticketDetail=function(id){if(!desk.loaded)return beforeDeskDetail(id);hdShow(id)};
-const beforeDeskAction=action;action=function(value){if(value==='new-ticket'&&state.role!=='employee'){if(!desk.loaded||!crm.loaded){toast('Esperá a que cargue Mesa de Ayuda.');return;}desk.draft={clientId:state.role==='client'?1:'',contactId:'',subscriptionId:'',type:'',title:'',description:'',priority:PRIORITY.MEDIUM,attachments:[]};desk.errors={};desk.touched=new Set();desk.view='new';state.page='support';render();return}beforeDeskAction(value)};
-const beforeDeskRender=render;render=function(){beforeDeskRender();if(state.page==='support'&&state.role!=='employee'){$('footer span').textContent='Mesa de Ayuda · Guardado persistente en este equipo';if(desk.view==='new')hdErrors()}};
-const hdDialog=document.createElement('dialog');hdDialog.id='desk-dialog';hdDialog.setAttribute('aria-labelledby','desk-dialog-title');document.body.appendChild(hdDialog);let hdFocus=null;
-function hdClose(){if(desk.busy)return;hdDialog.close();hdFocus?.focus()}
-function hdAgentRows(){const people=employees.filter(e=>e.laborStatus===LABOR.ACTIVE&&(e.name+' '+e.role).toLowerCase().includes(desk.agentQuery.toLowerCase())),suggested=people.filter(e=>/soporte|mesa de ayuda/i.test(e.area)),other=people.filter(e=>!suggested.includes(e)&&teamAvailability(e)===AVAILABILITY.AVAILABLE);const row=e=>`<label class="desk-agent-row"><input type="radio" name="desk-agent" value="${e.id}" ${desk.selectedAgent===e.id?'checked':''}>${personImage(e)}<span><strong>${esc(e.name)}</strong><small>${esc(e.role)}</small><small>${teamAvailability(e)} · ${desk.data.requests.filter(r=>r.agentId===e.id&&hdOpen(r)).length} solicitudes activas</small></span></label>`;return `<h3>Sugeridos</h3>${suggested.map(row).join('')||'<p class="sub">No hay agentes de Soporte coincidentes.</p>'}${other.length?'<h3>Otros disponibles</h3>'+other.map(row).join(''):''}`}
-function hdAssign(){const r=hd(desk.id);desk.selectedAgent=r.agentId;desk.agentQuery='';hdFocus=document.activeElement;hdDialog.innerHTML=`<h2 id="desk-dialog-title">Asignar agente</h2><label class="desk-field" for="desk-agent-search">Buscar agente<input id="desk-agent-search" type="search" placeholder="Nombre o puesto"></label><div id="desk-agent-list">${hdAgentRows()}</div><label class="desk-agent-row"><input type="radio" name="desk-agent" value="" ${desk.selectedAgent===null?'checked':''}>Dejar sin asignar</label><p id="desk-dialog-error" class="field-error" role="alert"></p><div class="crm-actions">${hdBtn('Cancelar','close')}${hdBtn('Asignar','save-agent','',true)}</div>`;hdDialog.showModal()}
-function hdTask(){hdFocus=document.activeElement;hdDialog.innerHTML=`<h2 id="desk-dialog-title">Crear tarea interna</h2><p class="sub">SOL-${desk.id} seguirá en Mesa de Ayuda. La tarea tendrá su propio responsable.</p><form id="desk-task-form" novalidate><label class="desk-field" for="dt-title">Título *<input id="dt-title" required maxlength="180" aria-describedby="dt-title-error"><small class="field-error" id="dt-title-error"></small></label><label class="desk-field" for="dt-owner">Responsable técnico *<select id="dt-owner" required aria-describedby="dt-owner-error"><option value="">Seleccionar empleado</option>${employees.filter(e=>e.laborStatus===LABOR.ACTIVE).sort((a,b)=>Number(/desarrollo|calidad/i.test(b.area))-Number(/desarrollo|calidad/i.test(a.area))).map(e=>`<option value="${e.id}">${esc(e.name)} · ${esc(e.role)}</option>`).join('')}</select><small class="field-error" id="dt-owner-error"></small></label><label class="desk-field" for="dt-priority">Prioridad *<select id="dt-priority">${desk.data.priorities.map(p=>`<option ${p===PRIORITY.MEDIUM?'selected':''}>${p}</option>`).join('')}</select></label><label class="desk-field" for="dt-due">Fecha límite<input id="dt-due" type="date" aria-describedby="dt-due-error"><small class="field-error" id="dt-due-error"></small></label><p id="desk-dialog-error" class="field-error" role="alert"></p><div class="crm-actions">${hdBtn('Cancelar','close')}<button class="button primary" id="desk-save-task" type="submit" disabled>Crear tarea</button></div></form>`;hdDialog.showModal()}
-async function hdMutate(action,payload){const r=hd(desk.id);try{const result=await hdApi('/requests/'+r.id+'/'+action,{version:r.version,...payload});await hdLoad(false);return result}catch(e){if(e.status===409)await hdLoad(false);throw e}}
-async function hdUpload(input){const mode=input.dataset.deskUpload,list=mode==='new'?desk.draft.attachments:desk.commentFiles,files=[...input.files];if(list.length+files.length>10){if(mode==='new'){desk.errors.attachments='Adjuntá hasta 10 archivos.';desk.touched.add('attachments');hdErrors()}else $('#desk-comment-error').textContent='Adjuntá hasta 10 archivos.';return}desk.busy=true;input.disabled=true;if(mode==='new')hdErrors();else $('#desk-comment-submit').disabled=true;try{for(const file of files){if(file.size>10*1024*1024)throw {errors:{attachments:'Cada archivo puede pesar hasta 10 MB.'}};const base64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.onerror=reject;r.readAsDataURL(file)});const result=await hdApi('/files',{name:file.name,base64});if(!list.includes(result.url))list.push(result.url);desk.data.files.push({id:result.url.split('/').pop(),name:result.name})}delete desk.errors.attachments;desk.busy=false;render()}catch(e){desk.busy=false;const message=Object.values(e.errors||{attachments:'No se pudo adjuntar el archivo.'}).join(' ');if(mode==='new'){desk.errors.attachments=message;desk.touched.add('attachments');render()}else{render();$('#desk-comment-error').textContent=message}}}
-document.addEventListener('click',async event=>{const b=event.target.closest('[data-desk]');if(!b)return;event.preventDefault();if(desk.busy)return;const op=b.dataset.desk;if(['assign','task','save-agent'].includes(op)&&!hdEditable())return;switch(op){case 'remove-new-file':desk.draft.attachments.splice(Number(b.dataset.id),1);delete desk.errors.attachments;render();break;case 'remove-comment-file':desk.commentFiles.splice(Number(b.dataset.id),1);render();break;case 'new':action('new-ticket');break;case 'list':if(!can('requests.viewAssigned')&&!can('requests.viewQueue')){nav('tasks');break;}case 'cancel-new':desk.view='list';desk.draft=null;render();break;case 'detail':hdShow(b.dataset.id);break;case 'table':case 'board':desk.mode=op;render();break;case 'clear':desk.query=desk.status=desk.priority='';render();break;case 'retry':await crLoad(false);await hdLoad();break;case 'activity':desk.allActivity=!desk.allActivity;render();break;case 'assign':hdAssign();break;case 'task':hdTask();break;case 'close':hdClose();break;case 'client-setup':clientDetail(desk.draft.clientId);break;case 'save-agent':desk.busy=true;b.disabled=true;try{await hdMutate('update',{agentId:desk.selectedAgent});desk.busy=false;hdClose();render();toast('Agente actualizado')}catch(e){desk.busy=false;$('#desk-dialog-error').textContent=Object.values(e.errors||{_form:'No se pudo asignar.'}).join(' ');b.disabled=false}break}});
-document.addEventListener('input',event=>{const el=event.target;if(el.id==='desk-query'){const pos=el.selectionStart;desk.query=el.value;render();$('#desk-query').focus();$('#desk-query').setSelectionRange(pos,pos)}if(el.id==='desk-agent-search'){desk.agentQuery=el.value;$('#desk-agent-list').innerHTML=hdAgentRows()}if(el.id==='desk-comment'){desk.commentText=el.value;$('#desk-comment-submit').disabled=desk.busy||!el.value.trim()}if(el.dataset.deskField&&el.tagName!=='SELECT'){desk.draft[el.dataset.deskField]=el.value;delete desk.errors[el.dataset.deskField];delete desk.errors._form;desk.touched.add(el.dataset.deskField);hdErrors()}if(el.id==='dt-title')$('#desk-save-task').disabled=desk.busy||!el.value.trim()||!$('#dt-owner').value});
-document.addEventListener('change',async event=>{const el=event.target;if(el.dataset.deskFilter){desk[el.dataset.deskFilter]=el.value;render()}if(el.dataset.deskField){const key=el.dataset.deskField;desk.draft[key]=key.endsWith('Id')?(el.value?Number(el.value):''):el.value;delete desk.errors[key];delete desk.errors._form;desk.touched.add(key);if(key==='clientId'){desk.draft.contactId=desk.draft.subscriptionId='';render()}else hdErrors()}if(el.name==='desk-agent')desk.selectedAgent=el.value?Number(el.value):null;if(el.id==='dt-owner')$('#desk-save-task').disabled=desk.busy||!el.value||!$('#dt-title').value.trim();if(el.dataset.deskUpload)await hdUpload(el);if(['desk-state','desk-priority'].includes(el.id)&&hdEditable()){desk.busy=true;el.disabled=true;try{await hdMutate('update',{[el.id==='desk-state'?'status':'priority']:el.value});desk.busy=false;render();toast('Solicitud actualizada')}catch(e){desk.busy=false;el.disabled=false;$('#desk-update-error').textContent=Object.values(e.errors||{_form:'No se pudo actualizar.'}).join(' ')}}});
-document.addEventListener('submit',async event=>{if(!['desk-new-form','desk-comment-form','desk-task-form'].includes(event.target.id))return;event.preventDefault();if(desk.busy)return;const kind=event.target.id;if(kind==='desk-new-form'&&Object.keys(hdNewErrors()).length)return;desk.busy=true;try{if(kind==='desk-new-form'){hdErrors();const result=await hdApi('/requests',desk.draft);await hdLoad(false);await crLoad(false);desk.draft=null;desk.busy=false;hdShow(result.request.id);toast('Solicitud creada en Mesa de Ayuda');return}if(kind==='desk-comment-form'){$('#desk-comment-submit').disabled=true;await hdMutate('comments',{text:desk.commentText,attachments:desk.commentFiles});desk.commentText='';desk.commentFiles=[]}else{$('#desk-save-task').disabled=true;await hdMutate('tasks',{title:$('#dt-title').value,owner:Number($('#dt-owner').value),priority:$('#dt-priority').value,due:$('#dt-due').value})}desk.busy=false;if(hdDialog.open)hdClose();render();toast(kind==='desk-comment-form'?'Comentario guardado':'Tarea vinculada. El agente de la solicitud no cambió.')}catch(e){desk.busy=false;const errors=e.errors||{_form:'No se pudo guardar. Tus datos se conservan.'};if(kind==='desk-new-form'){desk.errors=errors;Object.keys(errors).forEach(k=>desk.touched.add(k));hdErrors()}else if(kind==='desk-comment-form'){$('#desk-comment-error').textContent=Object.values(errors).join(' ');$('#desk-comment-submit').disabled=false}else{for(const key of ['title','owner','due']){const el=document.getElementById('dt-'+key+'-error');if(el)el.textContent=errors[key]||''}$('#desk-dialog-error').textContent=errors._form||errors.priority||'';$('#desk-save-task').disabled=false}}});
-document.addEventListener('focusout',event=>{const key=event.target.dataset.deskField;if(key&&desk.draft){desk.touched.add(key);hdErrors()}});
-hdDialog.addEventListener('cancel',event=>{event.preventDefault();hdClose()});
-(async()=>{if(!crm.loaded)await crLoad(false);await hdLoad()})();
+const desk = {
+  loaded: false,
+  error: '',
+  data: { requests: [], events: [], comments: [], tasks: [], files: [] },
+  view: 'list',
+  id: null,
+  mode: 'table',
+  query: '',
+  status: '',
+  priority: '',
+  draft: null,
+  errors: {},
+  touched: new Set(),
+  busy: false,
+  commentText: '',
+  commentFiles: [],
+  allActivity: false,
+  agentQuery: '',
+  selectedAgent: null,
+};
+const hd = (id) => desk.data.requests.find((r) => r.id === Number(id));
+const hdEditable = () => can('requests.changeStatus');
+// PORTAL-CLIENTE: reemplazar el 1 fijo por el cliente de la sesión.
+const hdCanView = (r) =>
+  state.role === 'admin' ||
+  (state.role === 'client'
+    ? r.clientId === 1
+    : (r.agentId === currentEmployeeId() && employeePermission('support')) ||
+      desk.data.tasks.some((t) => t.ticket === r.id && t.owner === currentEmployeeId()) ||
+      hdTakeable(r));
+const hdTakeable = (r) =>
+  !can('requests.manage') && can('requests.take') && !r.agentId && hdOpen(r);
+const hdBtn = (label, op, id = '', primary = false) =>
+  `<button type="button" class="button ${primary ? 'primary' : ''}" data-desk="${op}" data-id="${id}">${label}</button>`;
+const hdProduct = (r) =>
+  crProduct(crm.data.subscriptions.find((s) => s.id === r.subscriptionId)?.productId)?.name ||
+  'Producto no disponible';
+const hdAgent = (id) => (id ? crPerson(id) : '<span class="sub">Sin asignar</span>');
+const hdOpen = (r) => ![REQUEST.RESOLVED, REQUEST.CLOSED].includes(r.status);
+const hdStamp = (value) =>
+  new Intl.DateTimeFormat('es-AR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    hour12: false,
+  }).format(new Date(value));
+function hdWhen(value) {
+  const d = new Date(value),
+    today = new Date(),
+    yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  const time = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return d.toDateString() === today.toDateString()
+    ? 'Hoy, ' + time
+    : d.toDateString() === yesterday.toDateString()
+      ? 'Ayer, ' + time
+      : d.toLocaleDateString('es-AR');
+}
+function hdBadge(value) {
+  return `<span class="desk-badge ${value === PRIORITY.URGENT ? 'desk-urgent' : value === PRIORITY.HIGH ? 'desk-high' : ''}">${esc(value)}</span>`;
+}
+async function hdApi(path = '', data) {
+  const response = await fetch('/api/desk' + path, {
+    method: data === undefined ? 'GET' : 'POST',
+    headers: {
+      'X-Nexo-View': state.role,
+      'X-Nexo-Employee': String(currentEmployeeId()),
+      ...(data === undefined
+        ? {}
+        : { 'Content-Type': 'application/json', 'X-Nexo-Client': 'team' }),
+    },
+    body: data === undefined ? undefined : JSON.stringify(data),
+    cache: 'no-store',
+  });
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    throw {
+      errors: { _form: 'Mesa de Ayuda no está disponible. Conservamos los datos ingresados.' },
+    };
+  }
+  if (!response.ok) {
+    result.status = response.status;
+    throw result;
+  }
+  return result;
+}
+async function hdLoad(draw = true) {
+  try {
+    const data = await hdApi();
+    desk.data = data;
+    desk.loaded = true;
+    desk.error = '';
+    tickets = data.requests;
+  } catch (e) {
+    desk.error = Object.values(e.errors || { _form: 'No se pudo cargar Mesa de Ayuda.' }).join(' ');
+  }
+  if (draw) render();
+  document.dispatchEvent(new Event('nexo:data-changed'));
+  return !desk.error;
+}
+function hdList() {
+  let list = desk.data.requests
+    .filter(
+      (r) =>
+        hdCanView(r) &&
+        (!desk.status || r.status === desk.status) &&
+        (!desk.priority || r.priority === desk.priority) &&
+        ['SOL-' + r.id, '#' + r.id, r.title, cr(r.clientId)?.name]
+          .join(' ')
+          .toLowerCase()
+          .includes(desk.query.toLowerCase()),
+    )
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return (
+    heading(
+      'Solicitudes',
+      'Mesa de Ayuda · Necesidades de los clientes y seguimiento de atención.',
+      can('requests.manage') ? hdBtn('+ Nueva solicitud', 'new', '', true) : '',
+    ) +
+    `<div class="desk-toolbar"><label>Buscar solicitud<input id="desk-query" type="search" value="${esc(desk.query)}" placeholder="ID, título o cliente"></label><label>Estado<select data-desk-filter="status"><option value="">Todos los estados</option>${desk.data.states.map((s) => `<option ${s === desk.status ? 'selected' : ''}>${s}</option>`).join('')}</select></label><label>Prioridad<select data-desk-filter="priority"><option value="">Todas las prioridades</option>${desk.data.priorities.map((s) => `<option ${s === desk.priority ? 'selected' : ''}>${s}</option>`).join('')}</select></label>${hdBtn('Limpiar', 'clear')}<div class="desk-switch" role="group" aria-label="Presentación"><button data-desk="table" aria-pressed="${desk.mode === 'table'}">Tabla</button><button data-desk="board" aria-pressed="${desk.mode === 'board'}">Tablero</button></div></div><p class="desk-count">${list.length} solicitudes${desk.status ? ' · ' + esc(desk.status) : ''}</p>${
+      !list.length
+        ? visualState(
+            desk.data.requests.some(hdCanView) ? 'results' : 'requests',
+            desk.data.requests.some(hdCanView) ? hdBtn('Limpiar filtros', 'clear') : '',
+          )
+        : desk.mode === 'table'
+          ? `<section class="panel table-panel">${crTable(
+              [
+                'Solicitud',
+                'Cliente',
+                'Producto / servicio',
+                'Prioridad',
+                'Estado',
+                'Agente',
+                'Actualización',
+                'Acciones',
+              ],
+              list.map(
+                (r) =>
+                  `<tr><td><button class="desk-title-link" data-desk="detail" data-id="${r.id}"><small>SOL-${r.id}</small><strong>${esc(r.title)}</strong></button></td><td><div class="person">${personImage(cr(r.clientId), 'small', 'company')}<span>${esc(cr(r.clientId)?.name)}</span></div></td><td>${esc(hdProduct(r))}</td><td>${hdBadge(r.priority)}</td><td>${hdBadge(r.status)}</td><td>${hdAgent(r.agentId)}</td><td><time datetime="${r.updatedAt}">${hdWhen(r.updatedAt)}</time></td><td>${hdBtn('Ver detalle', 'detail', r.id)}</td></tr>`,
+              ),
+            )}</section>`
+          : `<div class="desk-board">${desk.data.states
+              .map(
+                (s) =>
+                  `<section class="desk-column"><h2>${s}<span>${list.filter((r) => r.status === s).length}</span></h2>${
+                    list
+                      .filter((r) => r.status === s)
+                      .map(
+                        (r) =>
+                          `<button class="desk-board-item" data-desk="detail" data-id="${r.id}"><small>SOL-${r.id} · ${esc(hdProduct(r))}</small><strong>${esc(r.title)}</strong><span>${esc(cr(r.clientId)?.name)}</span><div>${hdBadge(r.priority)}${r.agentId ? personImage(crEmployee(r.agentId)) : '<small>Sin asignar</small>'}</div></button>`,
+                      )
+                      .join('') || '<p class="sub">Sin solicitudes</p>'
+                  }</section>`,
+              )
+              .join('')}</div>`
+    }`
+  );
+}
+function hdFile(path) {
+  const f = desk.data.files.find((f) => path.endsWith(f.id));
+  return `<a href="${esc(path)}?download=1" class="desk-file" download>${ico('file')} ${esc(f?.name || 'Archivo adjunto')}</a>`;
+}
+function hdActivity(r) {
+  const list = desk.data.events.filter((e) => e.request_id === r.id);
+  return `<div class="desk-section-head"><h2>${desk.allActivity ? 'Actividad completa' : 'Actividad reciente'}</h2>${list.length > 3 ? hdBtn(desk.allActivity ? 'Ver menos' : 'Ver actividad completa', 'activity') : ''}</div><ol class="desk-activity">${(desk.allActivity ? list : list.slice(0, 3)).map((e) => `<li><time datetime="${e.created_at}">${hdWhen(e.created_at)}</time><div><strong>${esc(e.action)}</strong><p>${e.reference.startsWith('/api/desk/files/') ? hdFile(e.reference) : esc(e.reference)}</p><small>${esc(e.actor)}</small></div></li>`).join('')}</ol>`;
+}
+function hdDetail() {
+  const r = hd(desk.id);
+  if (!r || !hdCanView(r)) return crEmpty('Solicitud no disponible.');
+  const contact = crm.data.contacts.find((c) => c.id === r.contactId),
+    tasks = desk.data.tasks.filter((t) => t.ticket === r.id),
+    internal = state.role !== 'client';
+  return `${hdBtn('← Volver a Solicitudes', 'list')}<div class="desk-detail-head"><div><p class="eyebrow">SOL-${r.id}</p><h1>${esc(r.title)}</h1><div class="desk-client-line">${personImage(cr(r.clientId), 'small', 'company')}<span>${esc(cr(r.clientId)?.name)}</span><span class="sub">${esc(hdProduct(r))}</span></div><div class="desk-badges">${hdBadge(r.type)}${hdBadge(r.priority)}${hdBadge(r.status)}</div></div>${hdEditable() ? `<div class="desk-detail-controls"><label>Estado<select id="desk-state"><option>${r.status}</option>${desk.data.transitions[r.status].map((s) => `<option>${s}</option>`).join('')}</select></label><label>Prioridad<select id="desk-priority" ${!can('requests.manage') ? 'disabled' : ''}>${desk.data.priorities.map((p) => `<option ${p === r.priority ? 'selected' : ''}>${p}</option>`).join('')}</select></label><p id="desk-update-error" class="field-error" role="alert"></p></div>` : ''}</div><div class="desk-detail-grid"><article class="desk-main"><section><h2>Descripción</h2><p class="desk-description">${esc(r.description)}</p>${r.attachments.length ? `<div class="desk-files">${r.attachments.map(hdFile).join('')}</div>` : ''}</section>${
+    internal
+      ? `<section><div class="desk-section-head"><h2>Comentarios internos</h2></div>${
+          desk.data.comments
+            .filter((c) => c.request_id === r.id)
+            .map(
+              (c) =>
+                `<div class="desk-comment">${personImage({ name: c.actor })}<div><strong>${esc(c.actor)}</strong><time>${hdStamp(c.created_at)}</time><p>${esc(c.text)}</p><div class="desk-files">${c.attachments.map(hdFile).join('')}</div></div></div>`,
+            )
+            .join('') || '<p class="sub">Todavía no hay comentarios internos.</p>'
+        }${hdEditable() ? `<form id="desk-comment-form" novalidate><label for="desk-comment">Comentario interno</label><textarea id="desk-comment" rows="3" maxlength="10000" placeholder="Registrá el análisis o la información necesaria…" aria-describedby="desk-comment-error">${esc(desk.commentText)}</textarea><div id="desk-comment-files" class="desk-files">${desk.commentFiles.map((f, i) => hdFile(f) + hdBtn('Quitar', 'remove-comment-file', i)).join('')}</div><small id="desk-comment-error" class="field-error" role="alert"></small><div class="desk-comment-actions"><label class="button desk-upload">Adjuntar<input type="file" data-desk-upload="comment" multiple accept=".png,.jpg,.jpeg,.webp,.pdf,.docx,.xlsx,.txt,.log,.csv"></label><button class="button primary" id="desk-comment-submit" type="submit" ${!desk.commentText.trim() || desk.busy ? 'disabled' : ''}>Comentar</button></div><small class="sub">Hasta 10 archivos de 10 MB. Imágenes, PDF, documentos y logs.</small></form>` : ''}</section>`
+      : ''
+  }</article><div class="desk-context"><section><h2>Información</h2><dl><dt>Reportado por</dt><dd>${contact ? `${esc(contact.firstName + ' ' + contact.lastName)}<small>${esc(contact.position)}</small>` : 'Contacto no registrado en la importación'}</dd><dt>Creada</dt><dd>${hdStamp(r.createdAt)}</dd><dt>Última actualización</dt><dd>${hdStamp(r.updatedAt)}</dd></dl></section><section><h2>Atención</h2><dl><dt>Cola</dt><dd>Mesa de Ayuda</dd><dt>Agente asignado</dt><dd>${hdAgent(r.agentId)}${r.agentId ? `<small>${esc(crEmployee(r.agentId)?.role)}</small>` : ''}</dd></dl>${can('requests.manage') ? hdBtn('Cambiar', 'assign') : ''}${hdTakeable(r) ? hdBtn('Tomar solicitud', 'take', '', true) : ''}</section>${internal && tasks.length ? `<section><div class="desk-section-head"><h2>Trabajo vinculado</h2><span class="sub">${tasks.length} tareas</span></div>${tasks.map((t) => `<div class="desk-task"><small>TAR-${String(t.id).padStart(3, '0')}</small><strong>${esc(t.title)}</strong>${state.role === 'admin' || t.owner === currentEmployeeId() ? `<label><input type="checkbox" data-task="${t.id}" ${t.done ? 'checked' : ''}> Completada</label>` : ''}<p>${esc(t.status)} · ${esc(crEmployee(t.owner)?.name || 'Sin responsable')}</p>${t.due ? `<small>Vence: ${crDate(t.due)}</small>` : ''}</div>`).join('')}${hdEditable() ? hdBtn('+ Crear tarea', 'task') : ''}</section>` : ''}${internal && !tasks.length && hdEditable() ? `<div class="desk-create-task">${hdBtn('+ Crear tarea interna', 'task')}</div>` : ''}</div></div>${internal ? `<section class="desk-history">${hdActivity(r)}</section>` : ''}`;
+}
+function hdNewErrors() {
+  const d = desk.draft,
+    errors = {};
+  if (!d) return errors;
+  for (const key of [
+    'clientId',
+    'contactId',
+    'subscriptionId',
+    'type',
+    'title',
+    'description',
+    'priority',
+  ])
+    if (!String(d[key] || '').trim()) errors[key] = 'Este campo es obligatorio.';
+  if (d.title.length > 180) errors.title = 'Usá hasta 180 caracteres.';
+  if (d.description.length > 10000) errors.description = 'Usá hasta 10.000 caracteres.';
+  return { ...errors, ...desk.errors };
+}
+function hdField(key, label, options) {
+  const d = desk.draft;
+  return `<label class="desk-field" for="df-${key}">${label} *<select id="df-${key}" data-desk-field="${key}" required aria-describedby="df-${key}-error"><option value="">Seleccionar ${label.toLowerCase()}</option>${options
+    .map((x) => {
+      const [v, l] = Array.isArray(x) ? x : [x, x];
+      return `<option value="${esc(v)}" ${String(v) === String(d[key]) ? 'selected' : ''}>${esc(l)}</option>`;
+    })
+    .join('')}</select><small id="df-${key}-error" class="field-error"></small></label>`;
+}
+function hdNew() {
+  const d = desk.draft,
+    contacts = crRelated('contacts', d.clientId).filter((c) => c.status === LABOR.ACTIVE),
+    subs = crRelated('subscriptions', d.clientId).filter((s) => s.status !== 'Finalizado');
+  return (
+    hdBtn('← Volver a Solicitudes', 'cancel-new') +
+    heading(
+      'Nueva solicitud',
+      'Se registrará en Mesa de Ayuda, con estado Nueva y sin agente asignado.',
+    ) +
+    `<form id="desk-new-form" class="desk-new-form" novalidate><div class="desk-form-grid">${hdField(
+      'clientId',
+      'Cliente',
+      crm.data.clients
+        .filter(
+          (c) =>
+            !['Prospecto', 'Finalizado'].includes(c.status) &&
+            // PORTAL-CLIENTE: reemplazar el 1 fijo por el cliente de la sesión.
+            (state.role !== 'client' || c.id === 1),
+        )
+        .map((c) => [c.id, c.name]),
+    )}${hdField(
+      'contactId',
+      'Contacto',
+      contacts.map((c) => [c.id, c.firstName + ' ' + c.lastName]),
+    )}${hdField(
+      'subscriptionId',
+      'Producto / servicio',
+      subs.map((s) => [s.id, crProduct(s.productId)?.name + (s.plan ? ' · ' + s.plan : '')]),
+    )}${hdField('type', 'Tipo', desk.data.types)}${d.clientId && (!contacts.length || !subs.length) ? `<p class="desk-form-wide desk-note">${!contacts.length ? 'Este cliente necesita un contacto activo. ' : ''}${!subs.length ? 'Este cliente necesita un producto o servicio contratado. ' : ''}${hdEditable() ? `<button type="button" class="link" data-desk="client-setup">Abrir ficha del cliente</button>` : ''}</p>` : ''}<label class="desk-field desk-form-wide" for="df-title">Título *<input id="df-title" data-desk-field="title" required maxlength="180" value="${esc(d.title)}" aria-describedby="df-title-error"><small id="df-title-error" class="field-error"></small></label><label class="desk-field desk-form-wide" for="df-description">Descripción *<textarea id="df-description" data-desk-field="description" rows="4" required maxlength="10000" aria-describedby="df-description-error">${esc(d.description)}</textarea><small id="df-description-error" class="field-error"></small></label>${hdField('priority', 'Prioridad', desk.data.priorities)}<div class="desk-field"><label for="df-files">Adjuntos</label><input id="df-files" type="file" data-desk-upload="new" multiple accept=".png,.jpg,.jpeg,.webp,.pdf,.docx,.xlsx,.txt,.log,.csv"><small>Hasta 10 archivos de 10 MB.</small><div class="desk-files">${d.attachments.map((f, i) => hdFile(f) + hdBtn('Quitar', 'remove-new-file', i)).join('')}</div><small id="df-attachments-error" class="field-error"></small></div></div><p id="desk-form-error" class="field-error" role="alert"></p><div class="desk-new-footer"><span id="desk-save-hint" role="status"></span><div class="crm-actions">${hdBtn('Cancelar', 'cancel-new')}<button class="button primary" id="desk-create" type="submit">Crear solicitud</button></div></div></form>`
+  );
+}
+function hdErrors() {
+  if (!desk.draft) return;
+  const errors = hdNewErrors();
+  Object.keys({ ...desk.draft, ...errors }).forEach((k) => {
+    const el = document.getElementById('df-' + k),
+      msg = document.getElementById('df-' + k + '-error');
+    if (msg) msg.textContent = desk.touched.has(k) ? errors[k] || '' : '';
+    el?.setAttribute('aria-invalid', String(desk.touched.has(k) && !!errors[k]));
+  });
+  if ($('#desk-create')) {
+    $('#desk-create').disabled = desk.busy || Object.keys(errors).length > 0;
+    $('#desk-create').textContent = desk.busy ? 'Creando…' : 'Crear solicitud';
+    $('#desk-save-hint').textContent = desk.busy
+      ? 'Procesando…'
+      : Object.keys(errors).length
+        ? 'Completá los campos obligatorios.'
+        : 'Mesa de Ayuda · Sin asignar';
+    $('#desk-form-error').textContent = errors._form || '';
+  }
+}
+function hdShow(id) {
+  desk.id = Number(id);
+  desk.view = 'detail';
+  desk.allActivity = false;
+  desk.commentText = '';
+  desk.commentFiles = [];
+  state.page = 'support';
+  render();
+  window.scrollTo(0, 0);
+}
+support = function () {
+  return `<div class="desk-module">${!desk.loaded || !crm.loaded ? heading('Solicitudes', 'Mesa de Ayuda') + `${desk.error || crm.error ? visualState('error', hdBtn('Reintentar', 'retry')) : '<p role="status">Cargando solicitudes…</p>'}` : desk.view === 'new' ? hdNew() : desk.view === 'detail' ? hdDetail() : hdList()}</div>`;
+};
+const beforeDeskDetail = ticketDetail;
+ticketDetail = function (id) {
+  if (!desk.loaded) return beforeDeskDetail(id);
+  hdShow(id);
+};
+const beforeDeskAction = action;
+action = function (value) {
+  if (value === 'new-ticket' && state.role !== 'employee') {
+    if (!desk.loaded || !crm.loaded) {
+      toast('Esperá a que cargue Mesa de Ayuda.');
+      return;
+    }
+    desk.draft = {
+      // PORTAL-CLIENTE: reemplazar el 1 fijo por el cliente de la sesión.
+      clientId: state.role === 'client' ? 1 : '',
+      contactId: '',
+      subscriptionId: '',
+      type: '',
+      title: '',
+      description: '',
+      priority: PRIORITY.MEDIUM,
+      attachments: [],
+    };
+    desk.errors = {};
+    desk.touched = new Set();
+    desk.view = 'new';
+    state.page = 'support';
+    render();
+    return;
+  }
+  beforeDeskAction(value);
+};
+const beforeDeskRender = render;
+render = function () {
+  beforeDeskRender();
+  if (state.page === 'support' && state.role !== 'employee') {
+    $('footer span').textContent = 'Mesa de Ayuda · Guardado persistente en este equipo';
+    if (desk.view === 'new') hdErrors();
+  }
+};
+const hdDialog = document.createElement('dialog');
+hdDialog.id = 'desk-dialog';
+hdDialog.setAttribute('aria-labelledby', 'desk-dialog-title');
+document.body.appendChild(hdDialog);
+let hdFocus = null;
+function hdClose() {
+  if (desk.busy) return;
+  hdDialog.close();
+  hdFocus?.focus();
+}
+function hdAgentRows() {
+  const people = employees.filter(
+      (e) =>
+        e.laborStatus === LABOR.ACTIVE &&
+        (e.name + ' ' + e.role).toLowerCase().includes(desk.agentQuery.toLowerCase()),
+    ),
+    suggested = people.filter((e) => /soporte|mesa de ayuda/i.test(e.area)),
+    other = people.filter(
+      (e) => !suggested.includes(e) && teamAvailability(e) === AVAILABILITY.AVAILABLE,
+    );
+  const row = (e) =>
+    `<label class="desk-agent-row"><input type="radio" name="desk-agent" value="${e.id}" ${desk.selectedAgent === e.id ? 'checked' : ''}>${personImage(e)}<span><strong>${esc(e.name)}</strong><small>${esc(e.role)}</small><small>${teamAvailability(e)} · ${desk.data.requests.filter((r) => r.agentId === e.id && hdOpen(r)).length} solicitudes activas</small></span></label>`;
+  return `<h3>Sugeridos</h3>${suggested.map(row).join('') || '<p class="sub">No hay agentes de Soporte coincidentes.</p>'}${other.length ? '<h3>Otros disponibles</h3>' + other.map(row).join('') : ''}`;
+}
+function hdAssign() {
+  const r = hd(desk.id);
+  desk.selectedAgent = r.agentId;
+  desk.agentQuery = '';
+  hdFocus = document.activeElement;
+  hdDialog.innerHTML = `<h2 id="desk-dialog-title">Asignar agente</h2><label class="desk-field" for="desk-agent-search">Buscar agente<input id="desk-agent-search" type="search" placeholder="Nombre o puesto"></label><div id="desk-agent-list">${hdAgentRows()}</div><label class="desk-agent-row"><input type="radio" name="desk-agent" value="" ${desk.selectedAgent === null ? 'checked' : ''}>Dejar sin asignar</label><p id="desk-dialog-error" class="field-error" role="alert"></p><div class="crm-actions">${hdBtn('Cancelar', 'close')}${hdBtn('Asignar', 'save-agent', '', true)}</div>`;
+  hdDialog.showModal();
+}
+function hdTask() {
+  hdFocus = document.activeElement;
+  hdDialog.innerHTML = `<h2 id="desk-dialog-title">Crear tarea interna</h2><p class="sub">SOL-${desk.id} seguirá en Mesa de Ayuda. La tarea tendrá su propio responsable.</p><form id="desk-task-form" novalidate><label class="desk-field" for="dt-title">Título *<input id="dt-title" required maxlength="180" aria-describedby="dt-title-error"><small class="field-error" id="dt-title-error"></small></label><label class="desk-field" for="dt-owner">Responsable técnico *<select id="dt-owner" required aria-describedby="dt-owner-error"><option value="">Seleccionar empleado</option>${employees
+    .filter((e) => e.laborStatus === LABOR.ACTIVE)
+    .sort(
+      (a, b) =>
+        Number(/desarrollo|calidad/i.test(b.area)) - Number(/desarrollo|calidad/i.test(a.area)),
+    )
+    .map((e) => `<option value="${e.id}">${esc(e.name)} · ${esc(e.role)}</option>`)
+    .join(
+      '',
+    )}</select><small class="field-error" id="dt-owner-error"></small></label><label class="desk-field" for="dt-priority">Prioridad *<select id="dt-priority">${desk.data.priorities.map((p) => `<option ${p === PRIORITY.MEDIUM ? 'selected' : ''}>${p}</option>`).join('')}</select></label><label class="desk-field" for="dt-due">Fecha límite<input id="dt-due" type="date" aria-describedby="dt-due-error"><small class="field-error" id="dt-due-error"></small></label><p id="desk-dialog-error" class="field-error" role="alert"></p><div class="crm-actions">${hdBtn('Cancelar', 'close')}<button class="button primary" id="desk-save-task" type="submit" disabled>Crear tarea</button></div></form>`;
+  hdDialog.showModal();
+}
+async function hdMutate(action, payload) {
+  const r = hd(desk.id);
+  try {
+    const result = await hdApi('/requests/' + r.id + '/' + action, {
+      version: r.version,
+      ...payload,
+    });
+    await hdLoad(false);
+    return result;
+  } catch (e) {
+    if (e.status === 409) await hdLoad(false);
+    throw e;
+  }
+}
+async function hdUpload(input) {
+  const mode = input.dataset.deskUpload,
+    list = mode === 'new' ? desk.draft.attachments : desk.commentFiles,
+    files = [...input.files];
+  if (list.length + files.length > 10) {
+    if (mode === 'new') {
+      desk.errors.attachments = 'Adjuntá hasta 10 archivos.';
+      desk.touched.add('attachments');
+      hdErrors();
+    } else $('#desk-comment-error').textContent = 'Adjuntá hasta 10 archivos.';
+    return;
+  }
+  desk.busy = true;
+  input.disabled = true;
+  if (mode === 'new') hdErrors();
+  else $('#desk-comment-submit').disabled = true;
+  try {
+    for (const file of files) {
+      if (file.size > 10 * 1024 * 1024)
+        throw { errors: { attachments: 'Cada archivo puede pesar hasta 10 MB.' } };
+      const base64 = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result.split(',')[1]);
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+      const result = await hdApi('/files', { name: file.name, base64 });
+      if (!list.includes(result.url)) list.push(result.url);
+      desk.data.files.push({ id: result.url.split('/').pop(), name: result.name });
+    }
+    delete desk.errors.attachments;
+    desk.busy = false;
+    render();
+  } catch (e) {
+    desk.busy = false;
+    const message = Object.values(
+      e.errors || { attachments: 'No se pudo adjuntar el archivo.' },
+    ).join(' ');
+    if (mode === 'new') {
+      desk.errors.attachments = message;
+      desk.touched.add('attachments');
+      render();
+    } else {
+      render();
+      $('#desk-comment-error').textContent = message;
+    }
+  }
+}
+document.addEventListener('click', async (event) => {
+  const b = event.target.closest('[data-desk]');
+  if (!b) return;
+  event.preventDefault();
+  if (desk.busy) return;
+  const op = b.dataset.desk;
+  if (['assign', 'task', 'save-agent'].includes(op) && !hdEditable()) return;
+  switch (op) {
+    case 'remove-new-file':
+      desk.draft.attachments.splice(Number(b.dataset.id), 1);
+      delete desk.errors.attachments;
+      render();
+      break;
+    case 'remove-comment-file':
+      desk.commentFiles.splice(Number(b.dataset.id), 1);
+      render();
+      break;
+    case 'new':
+      action('new-ticket');
+      break;
+    case 'list':
+      if (!can('requests.viewAssigned') && !can('requests.viewQueue')) {
+        nav('tasks');
+        break;
+      }
+    case 'cancel-new':
+      desk.view = 'list';
+      desk.draft = null;
+      render();
+      break;
+    case 'detail':
+      hdShow(b.dataset.id);
+      break;
+    case 'table':
+    case 'board':
+      desk.mode = op;
+      render();
+      break;
+    case 'clear':
+      desk.query = desk.status = desk.priority = '';
+      render();
+      break;
+    case 'retry':
+      await crLoad(false);
+      await hdLoad();
+      break;
+    case 'activity':
+      desk.allActivity = !desk.allActivity;
+      render();
+      break;
+    case 'assign':
+      hdAssign();
+      break;
+    case 'take':
+      desk.busy = true;
+      b.disabled = true;
+      try {
+        await hdMutate('update', { agentId: currentEmployeeId() });
+        toast('Solicitud tomada');
+      } catch (e) {
+        toast(Object.values(e.errors || { _form: 'No se pudo tomar la solicitud.' }).join(' '));
+      } finally {
+        desk.busy = false;
+        render();
+      }
+      break;
+    case 'task':
+      hdTask();
+      break;
+    case 'close':
+      hdClose();
+      break;
+    case 'client-setup':
+      clientDetail(desk.draft.clientId);
+      break;
+    case 'save-agent':
+      desk.busy = true;
+      b.disabled = true;
+      try {
+        await hdMutate('update', { agentId: desk.selectedAgent });
+        desk.busy = false;
+        hdClose();
+        render();
+        toast('Agente actualizado');
+      } catch (e) {
+        desk.busy = false;
+        $('#desk-dialog-error').textContent = Object.values(
+          e.errors || { _form: 'No se pudo asignar.' },
+        ).join(' ');
+        b.disabled = false;
+      }
+      break;
+  }
+});
+document.addEventListener('input', (event) => {
+  const el = event.target;
+  if (el.id === 'desk-query') {
+    const pos = el.selectionStart;
+    desk.query = el.value;
+    render();
+    $('#desk-query').focus();
+    $('#desk-query').setSelectionRange(pos, pos);
+  }
+  if (el.id === 'desk-agent-search') {
+    desk.agentQuery = el.value;
+    $('#desk-agent-list').innerHTML = hdAgentRows();
+  }
+  if (el.id === 'desk-comment') {
+    desk.commentText = el.value;
+    $('#desk-comment-submit').disabled = desk.busy || !el.value.trim();
+  }
+  if (el.dataset.deskField && el.tagName !== 'SELECT') {
+    desk.draft[el.dataset.deskField] = el.value;
+    delete desk.errors[el.dataset.deskField];
+    delete desk.errors._form;
+    desk.touched.add(el.dataset.deskField);
+    hdErrors();
+  }
+  if (el.id === 'dt-title')
+    $('#desk-save-task').disabled = desk.busy || !el.value.trim() || !$('#dt-owner').value;
+});
+document.addEventListener('change', async (event) => {
+  const el = event.target;
+  if (el.dataset.deskFilter) {
+    desk[el.dataset.deskFilter] = el.value;
+    render();
+  }
+  if (el.dataset.deskField) {
+    const key = el.dataset.deskField;
+    desk.draft[key] = key.endsWith('Id') ? (el.value ? Number(el.value) : '') : el.value;
+    delete desk.errors[key];
+    delete desk.errors._form;
+    desk.touched.add(key);
+    if (key === 'clientId') {
+      desk.draft.contactId = desk.draft.subscriptionId = '';
+      render();
+    } else hdErrors();
+  }
+  if (el.name === 'desk-agent') desk.selectedAgent = el.value ? Number(el.value) : null;
+  if (el.id === 'dt-owner')
+    $('#desk-save-task').disabled = desk.busy || !el.value || !$('#dt-title').value.trim();
+  if (el.dataset.deskUpload) await hdUpload(el);
+  if (['desk-state', 'desk-priority'].includes(el.id) && hdEditable()) {
+    desk.busy = true;
+    el.disabled = true;
+    try {
+      await hdMutate('update', { [el.id === 'desk-state' ? 'status' : 'priority']: el.value });
+      desk.busy = false;
+      render();
+      toast('Solicitud actualizada');
+    } catch (e) {
+      desk.busy = false;
+      el.disabled = false;
+      $('#desk-update-error').textContent = Object.values(
+        e.errors || { _form: 'No se pudo actualizar.' },
+      ).join(' ');
+    }
+  }
+});
+document.addEventListener('submit', async (event) => {
+  if (!['desk-new-form', 'desk-comment-form', 'desk-task-form'].includes(event.target.id)) return;
+  event.preventDefault();
+  if (desk.busy) return;
+  const kind = event.target.id;
+  if (kind === 'desk-new-form' && Object.keys(hdNewErrors()).length) return;
+  desk.busy = true;
+  try {
+    if (kind === 'desk-new-form') {
+      hdErrors();
+      const result = await hdApi('/requests', desk.draft);
+      await hdLoad(false);
+      await crLoad(false);
+      desk.draft = null;
+      desk.busy = false;
+      hdShow(result.request.id);
+      toast('Solicitud creada en Mesa de Ayuda');
+      return;
+    }
+    if (kind === 'desk-comment-form') {
+      $('#desk-comment-submit').disabled = true;
+      await hdMutate('comments', { text: desk.commentText, attachments: desk.commentFiles });
+      desk.commentText = '';
+      desk.commentFiles = [];
+    } else {
+      $('#desk-save-task').disabled = true;
+      await hdMutate('tasks', {
+        title: $('#dt-title').value,
+        owner: Number($('#dt-owner').value),
+        priority: $('#dt-priority').value,
+        due: $('#dt-due').value,
+      });
+    }
+    desk.busy = false;
+    if (hdDialog.open) hdClose();
+    render();
+    toast(
+      kind === 'desk-comment-form'
+        ? 'Comentario guardado'
+        : 'Tarea vinculada. El agente de la solicitud no cambió.',
+    );
+  } catch (e) {
+    desk.busy = false;
+    const errors = e.errors || { _form: 'No se pudo guardar. Tus datos se conservan.' };
+    if (kind === 'desk-new-form') {
+      desk.errors = errors;
+      Object.keys(errors).forEach((k) => desk.touched.add(k));
+      hdErrors();
+    } else if (kind === 'desk-comment-form') {
+      $('#desk-comment-error').textContent = Object.values(errors).join(' ');
+      $('#desk-comment-submit').disabled = false;
+    } else {
+      for (const key of ['title', 'owner', 'due']) {
+        const el = document.getElementById('dt-' + key + '-error');
+        if (el) el.textContent = errors[key] || '';
+      }
+      $('#desk-dialog-error').textContent = errors._form || errors.priority || '';
+      $('#desk-save-task').disabled = false;
+    }
+  }
+});
+document.addEventListener('focusout', (event) => {
+  const key = event.target.dataset.deskField;
+  if (key && desk.draft) {
+    desk.touched.add(key);
+    hdErrors();
+  }
+});
+hdDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  hdClose();
+});
+(async () => {
+  if (!crm.loaded) await crLoad(false);
+  await hdLoad();
+})();
 
 // Sincroniza únicamente las tareas vinculadas que se completan desde la vista existente.
-document.addEventListener('change',async event=>{const id=Number(event.target.dataset.task);if(!id||!desk.loaded)return;const task=desk.data.tasks.find(t=>t.id===id),request=task&&hd(task.ticket);if(!request)return;try{await hdApi('/requests/'+request.id+'/task-status',{version:request.version,taskId:id,done:event.target.checked});await hdLoad(false);render()}catch{await hdLoad(false);render();toast('No se pudo guardar el estado de la tarea. Se restauró el estado del servidor.')}});
+document.addEventListener('change', async (event) => {
+  const id = Number(event.target.dataset.task);
+  if (!id || !desk.loaded) return;
+  const task = desk.data.tasks.find((t) => t.id === id),
+    request = task && hd(task.ticket);
+  if (!request) return;
+  try {
+    await hdApi('/requests/' + request.id + '/task-status', {
+      version: request.version,
+      taskId: id,
+      done: event.target.checked,
+    });
+    await hdLoad(false);
+    render();
+  } catch {
+    await hdLoad(false);
+    render();
+    toast('No se pudo guardar el estado de la tarea. Se restauró el estado del servidor.');
+  }
+});

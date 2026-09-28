@@ -1,0 +1,4 @@
+# Herramientas de desarrollo (no se usan en ejecución). Configuración: pyproject.toml y .prettierrc.json.
+# Formatear:  python -m black src/backend tests
+#             npx prettier@3 --write "src/**/*.{js,css,html,json}" build.js "tests/*.cjs"
+black>=24,<26

@@ -44,6 +44,7 @@
     ],
     "SUPPORT": [
       "requests.viewAssigned",
+      "requests.take",
       "requests.changeStatus",
       "requests.internalNote",
       "requests.createTask",
@@ -52,12 +53,7 @@
       "leaves.viewOwn",
       "leaves.createOwn"
     ],
-    "EMPLOYEE": [
-      "tasks.viewAssigned",
-      "tasks.updateAssigned",
-      "leaves.viewOwn",
-      "leaves.createOwn"
-    ]
+    "EMPLOYEE": ["tasks.viewAssigned", "tasks.updateAssigned", "leaves.viewOwn", "leaves.createOwn"]
   },
   "profileLabels": {
     "ADMINISTRATOR": "Administrador",
