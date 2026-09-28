@@ -73,7 +73,8 @@ def verify(password, encoded):
         return False
 
 
-def public(row, connection=None):
+def public(row, connection=None, employees=None):
+    """employees: filas de empleados por id ya leídas, para listar cuentas sin una consulta por cuenta."""
     d = {
         k: row[k]
         for k in [
@@ -92,7 +93,9 @@ def public(row, connection=None):
     d["permissions"] = PROFILES.get(d["permissionProfile"], [])
     d["employee"] = None
     if d["employeeId"]:
-        if connection is not None:
+        if employees is not None:
+            e = employees.get(d["employeeId"])
+        elif connection is not None:
             e = connection.execute(
                 "SELECT * FROM employees WHERE id=?", (d["employeeId"],)
             ).fetchone()
@@ -243,6 +246,7 @@ def save_user(data, id=None):
                 {"employeeId": employee, "role": role, "permissionProfile": profile},
             )
         result = dict(c.execute("SELECT * FROM users WHERE id=?", (id,)).fetchone())
+    forget_sessions()  # Permisos, estado o credenciales pudieron cambiar.
     return public(result)
 
 
@@ -270,6 +274,22 @@ def cookie_header(token, remember=False):
     )
 
 
+# Caché de sesiones validadas: evita 3 a 5 consultas remotas por petición. Toda operación que cambia
+# cuentas, empleados o sesiones llama a forget_sessions(), así la revocación sigue siendo inmediata.
+SESSION_CACHE_SECONDS = 30
+SESSION_TOUCH_SECONDS = 300
+SESSION_CACHE = {}
+SESSION_LOCK = threading.Lock()
+
+
+def forget_sessions(digest=None):
+    with SESSION_LOCK:
+        if digest:
+            SESSION_CACHE.pop(digest, None)
+        else:
+            SESSION_CACHE.clear()
+
+
 def session(handler):
     jar = SimpleCookie()
     try:
@@ -279,38 +299,73 @@ def session(handler):
         raise team.Validation({"_form": "Iniciá sesión para continuar."}, 401)
     digest = hashlib.sha256(token.encode()).hexdigest()
     now = time.time()
-    expired = False
-    with team.connect() as c:
-        row = c.execute(
-            "SELECT users.*,sessions.csrf,sessions.expiresAt,sessions.lastSeen,sessions.idleSeconds FROM sessions JOIN users ON users.id=sessions.userId WHERE tokenHash=?",
-            (digest,),
-        ).fetchone()
-        if (
-            not row
-            or row["status"] != "ACTIVE"
-            or row["expiresAt"] <= now
-            or row["lastSeen"] + row["idleSeconds"] <= now
-        ):
-            # El borrado debe confirmarse: una excepción dentro del bloque haría rollback.
-            c.execute("DELETE FROM sessions WHERE tokenHash=?", (digest,))
-            expired = True
-    if expired:
-        raise team.Validation({"_form": "La sesión venció. Volvé a ingresar."}, 401)
-    with team.connect() as c:
-        user = public(row, c)
-        if user["employeeId"] and (
-            not user["employee"] or user["employee"]["laborStatus"] != team.LABOR.ACTIVE
-        ):
+    with SESSION_LOCK:
+        cached = SESSION_CACHE.get(digest)
+    if (
+        cached
+        and now - cached[0] < SESSION_CACHE_SECONDS
+        and cached[1]["expiresAt"] > now
+        and cached[1]["lastSeen"] + cached[1]["idleSeconds"] > now
+    ):
+        row, user = cached[1], {**cached[2]}
+    else:
+        expired = blocked = False
+        with team.connect() as c:
+            row = c.execute(
+                "SELECT users.*,sessions.csrf,sessions.expiresAt,sessions.lastSeen,sessions.idleSeconds FROM sessions JOIN users ON users.id=sessions.userId WHERE tokenHash=?",
+                (digest,),
+            ).fetchone()
+            if (
+                not row
+                or row["status"] != "ACTIVE"
+                or row["expiresAt"] <= now
+                or row["lastSeen"] + row["idleSeconds"] <= now
+            ):
+                c.execute("DELETE FROM sessions WHERE tokenHash=?", (digest,))
+                expired = True
+            else:
+                row = dict(row)
+                user = public(row, c)
+                blocked = bool(user["employeeId"]) and (
+                    not user["employee"] or user["employee"]["laborStatus"] != team.LABOR.ACTIVE
+                )
+                # Escribir en cada petición serializaba todas las cargas (bloqueo de escritura en
+                # PostgreSQL). La inactividad se mide en horas: basta con registrarla cada 5 minutos.
+                if not blocked and now - row["lastSeen"] > SESSION_TOUCH_SECONDS:
+                    c.execute("UPDATE sessions SET lastSeen=? WHERE tokenHash=?", (now, digest))
+                    row["lastSeen"] = now
+        # Las excepciones van fuera del bloque: dentro, el borrado de la sesión se desharía.
+        if expired:
+            forget_sessions(digest)
+            raise team.Validation({"_form": "La sesión venció. Volvé a ingresar."}, 401)
+        if blocked:
             raise team.Validation(
                 {"_form": "No podés acceder a VitaDev con esta cuenta. Contactá al administrador."},
                 401,
             )
-        c.execute("UPDATE sessions SET lastSeen=? WHERE tokenHash=?", (now, digest))
+        with SESSION_LOCK:
+            SESSION_CACHE[digest] = (now, row, {**user})
     user["csrfToken"] = row["csrf"]
     handler.session_hash = digest
     handler.principal = user
     principal.set(user)
     return user
+
+
+def visible_requests(user, requests, tasks):
+    """Solicitudes que el usuario puede ver, a partir de datos ya cargados (sin consultar la base)."""
+    own = {t["ticket"] for t in tasks if t["owner"] == user["employeeId"]}
+    queue = "requests.viewQueue" in user["permissions"]
+    assigned = "requests.viewAssigned" in user["permissions"]
+    take = "requests.take" in user["permissions"]
+    return [
+        r
+        for r in requests
+        if queue
+        or (assigned and r.get("agentId") == user["employeeId"])
+        or r["id"] in own
+        or (take and unclaimed(r))
+    ]
 
 
 def scoped_requests(user, handler=None):
@@ -325,22 +380,8 @@ def scoped_requests(user, handler=None):
             {**json.loads(r["payload"]), "id": r["id"]}
             for r in c.execute("SELECT * FROM desk_tasks")
         ]
-        requests = [
-            {**json.loads(r["payload"]), "id": r["id"], "version": r["version"]}
-            for r in c.execute("SELECT * FROM desk_requests")
-        ]
-    own = {t["ticket"] for t in tasks if t["owner"] == user["employeeId"]}
-    queue = "requests.viewQueue" in user["permissions"]
-    assigned = "requests.viewAssigned" in user["permissions"]
-    take = "requests.take" in user["permissions"]
-    result = [
-        r
-        for r in requests
-        if queue
-        or (assigned and r.get("agentId") == user["employeeId"])
-        or r["id"] in own
-        or (take and unclaimed(r))
-    ], tasks
+        requests = desk.all_requests(c)
+    result = visible_requests(user, requests, tasks), tasks
     if handler is not None and handler.command == "GET":
         handler.scope_cache = result
     return result
@@ -431,6 +472,8 @@ def authorize(handler, write=False):
             )
         return  # leave.context enforces identity for creation, cancellation and attachments.
     if path.startswith("/api/desk"):
+        if not write and "/files/" not in path:
+            return  # El listado se filtra en filter_response con los datos ya leídos.
         requests, tasks = scoped_requests(user, handler)
         ids = {r["id"] for r in requests}
         if not write:
@@ -531,7 +574,8 @@ def filter_response(handler, data):
     if path == "/api/absences/availability" and "leaves.manage" not in permissions:
         data["periods"] = [e for e in data["periods"] if e["employee"] == user["employeeId"]]
     if path == "/api/desk":
-        allowed, tasks = scoped_requests(user, handler)
+        tasks = data["tasks"]
+        allowed = visible_requests(user, data["requests"], tasks)
         ids = {r["id"] for r in allowed}
         data["requests"] = allowed
         data["tasks"] = [

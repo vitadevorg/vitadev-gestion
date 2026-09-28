@@ -15,6 +15,8 @@ const paths = {
   box: 'M3 7l9-5 9 5v11l-9 5-9-5z M3 7l9 5 9-5 M12 12v11',
   book: 'M4 3h15v18H4z M8 7h7 M8 11h7',
   arrow: 'M5 12h14 M13 6l6 6-6 6',
+  edit: 'M12 20h9 M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z',
+  more: 'M5 12h.01 M12 12h.01 M19 12h.01',
   check: 'M5 12l4 4L19 6',
   spark: 'M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z',
 };
@@ -237,8 +239,12 @@ document.addEventListener('input', (e) => {
     : '<p>Buscá por nombre o solicitud.</p>';
 });
 
+// Al volver a la ventana se refrescan las solicitudes, como máximo una vez por minuto.
+let deskFocusAt = Date.now();
 window.addEventListener('focus', () => {
-  if (typeof desk !== 'undefined' && !desk.busy) hdLoad(false).then(() => render());
+  if (typeof desk === 'undefined' || desk.busy || Date.now() - deskFocusAt < 60000) return;
+  deskFocusAt = Date.now();
+  hdLoad(false).then(() => render());
 });
 window.addEventListener('popstate', () => {
   state.page = privateRoutes[location.pathname.slice(1)] || 'home';

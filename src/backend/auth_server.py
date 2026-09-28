@@ -46,14 +46,13 @@ class Handler(reports.Handler):
                 return self.send_json(200, auth.POLICY)
             with team.connect() as c:
                 if path == "/api/users":
+                    employee_rows, user_rows = team.select_many(
+                        c, "SELECT * FROM employees", "SELECT * FROM users ORDER BY id"
+                    )
+                    employees = {e["id"]: e for e in employee_rows}
                     return self.send_json(
                         200,
-                        {
-                            "users": [
-                                auth.public(r, c)
-                                for r in c.execute("SELECT * FROM users ORDER BY id")
-                            ]
-                        },
+                        {"users": [auth.public(r, c, employees) for r in user_rows]},
                     )
                 row = c.execute(
                     "SELECT * FROM users WHERE id=?", (int(path.rsplit("/", 1)[-1]),)
@@ -154,6 +153,7 @@ class Handler(reports.Handler):
                             (hashlib.sha256(previous[auth.COOKIE].value.encode()).hexdigest(),),
                         )
                     c.execute("DELETE FROM sessions WHERE expiresAt<?", (now,))
+                    auth.forget_sessions()
                     c.execute("DELETE FROM login_attempts WHERE key=?", (key,))
                     c.execute(
                         "INSERT INTO sessions VALUES(?,?,?,?,?,?)",
@@ -181,6 +181,7 @@ class Handler(reports.Handler):
                 with team.connect() as c:
                     c.execute("DELETE FROM sessions WHERE tokenHash=?", (self.session_hash,))
                     auth.audit(c, "Cierre de sesión", self.principal["id"])
+                auth.forget_sessions(self.session_hash)
                 self.extra_headers = [("Set-Cookie", auth.cookie_header("") + "; Max-Age=0")]
                 return self.send_json(200, {"ok": True})
             if path == "/api/users" and self.command == "POST":
@@ -253,6 +254,9 @@ if __name__ == "__main__":
             sys.exit(" ".join(e.fields.values()))
     else:
         port = int(os.environ.get("NEXO_PORT", "4173"))
+        if team.pg.enabled():
+            print("Preparando conexiones con la base de datos…", flush=True)
+            team.pg.warm()
         server = Server(("127.0.0.1", port), Handler)
         print(f"VitaDev: http://127.0.0.1:{port}/login", flush=True)
         server.serve_forever()

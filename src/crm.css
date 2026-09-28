@@ -501,3 +501,167 @@
     padding: 18px;
   }
 }
+
+/* Tabla de clientes: textos que se ajustan, fila que abre la ficha y acciones de ícono alineadas. */
+.crm-table-panel {
+  container-type: inline-size;
+}
+.crm-table-panel table {
+  white-space: normal;
+}
+.crm-table-panel th,
+.crm-table-panel td {
+  vertical-align: middle;
+  padding-inline: 12px;
+  white-space: normal;
+}
+.crm-table-panel .person,
+.crm-table-panel .person span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.crm-row {
+  cursor: pointer;
+}
+.crm-name-link {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+.crm-row:hover .crm-name-link,
+.crm-name-link:focus-visible {
+  color: var(--blue);
+}
+.crm-table-panel .person small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.crm-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--neutral-bg);
+  color: var(--neutral);
+  font-size: 12px;
+  font-weight: 650;
+}
+.crm-cell-actions {
+  width: 1%;
+}
+.crm-row-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.icon-action,
+.crm-row-actions .crm-menu summary {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+.icon-action:hover,
+.crm-row-actions .crm-menu summary:hover,
+.crm-row-actions .crm-menu[open] summary {
+  background: var(--surface-muted);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+.icon-action svg,
+.crm-row-actions .crm-menu summary svg {
+  width: 16px;
+  height: 16px;
+}
+.crm-row-actions .crm-menu summary svg {
+  stroke-width: 3;
+}
+
+/* Panel angosto: cada cliente como tarjeta, sin desplazamiento horizontal. */
+@container (max-width: 760px) {
+  .crm-table-panel thead {
+    display: none;
+  }
+  .crm-table-panel table,
+  .crm-table-panel tbody {
+    display: block;
+  }
+  .crm-table-panel .crm-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'client actions'
+      'status status'
+      'products products'
+      'owner owner'
+      'meta meta';
+    gap: 8px 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .crm-table-panel .crm-row td {
+    display: block;
+    width: auto;
+    padding: 0;
+    border: 0;
+  }
+  .crm-cell-client {
+    grid-area: client;
+  }
+  .crm-cell-actions {
+    grid-area: actions;
+  }
+  .crm-cell-status {
+    grid-area: status;
+  }
+  .crm-cell-products {
+    grid-area: products;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .crm-cell-owner {
+    grid-area: owner;
+    font-size: 13px;
+  }
+  .crm-table-panel .crm-cell-open,
+  .crm-table-panel .crm-cell-renewal {
+    display: inline;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .crm-cell-open {
+    grid-area: meta;
+  }
+  .crm-cell-open::before {
+    content: 'Solicitudes abiertas ';
+  }
+  .crm-cell-renewal {
+    grid-area: meta;
+    justify-self: end;
+  }
+  .crm-cell-renewal::before {
+    content: 'Renovación ';
+  }
+}

@@ -127,14 +127,21 @@ async function authStart() {
     'users.js',
   ];
   try {
-    for (const src of scripts)
-      await new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = src;
-        script.onload = resolve;
-        script.onerror = reject;
-        document.body.append(script);
-      });
+    // async = false: se descargan en paralelo pero se ejecutan en este orden (los módulos dependen
+    // de app.js). Antes se pedían de a uno y las cargas de datos arrancaban escalonadas.
+    await Promise.all(
+      scripts.map(
+        (src) =>
+          new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = src;
+            script.async = false;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.body.append(script);
+          }),
+      ),
+    );
     authLoaded = true;
     document.body.classList.remove('auth-locked');
     document.querySelector('#auth-root').innerHTML = '';
@@ -148,8 +155,11 @@ async function authStart() {
 window.addEventListener('pageshow', (e) => {
   if (e.persisted) location.reload();
 });
+// Comprueba que la sesión siga vigente al volver a la ventana, como máximo una vez por minuto.
+let authFocusAt = Date.now();
 window.addEventListener('focus', async () => {
-  if (authLoaded) {
+  if (authLoaded && Date.now() - authFocusAt > 60000) {
+    authFocusAt = Date.now();
     try {
       authSession = (await authRequest('/api/auth/me')).user;
       render();

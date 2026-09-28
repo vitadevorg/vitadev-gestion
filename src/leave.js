@@ -71,13 +71,15 @@ async function lvLoad(draw = true) {
   const sequence = ++lvSequence,
     role = state.role;
   try {
-    const available = await lvApi('/availability');
+    // Ambas lecturas en paralelo: antes la segunda esperaba a que terminara la primera.
+    const [available, data] = await Promise.all([
+      lvApi('/availability'),
+      ['admin', 'employee'].includes(role) ? lvApi() : { items: [], events: [], types: [] },
+    ]);
     if (sequence !== lvSequence || role !== state.role) return;
     lv.today = available.today;
     team.today = available.today;
-    let data = { items: [], events: [], types: [] };
-    if (['admin', 'employee'].includes(role)) data = await lvApi();
-    if (sequence !== lvSequence || role !== state.role) return;
+    lv.loadedAt = Date.now();
     lv.items = data.items;
     lv.events = data.events;
     lv.types = data.types;
@@ -605,12 +607,16 @@ lvDialog.addEventListener('cancel', (e) => {
   lvClose();
 });
 // Actualiza al volver a la ventana y al cambiar de día; no persiste disponibilidad derivada.
+// Como máximo una vez por minuto: el foco también llega al iniciar sesión y al alternar ventanas.
 window.addEventListener('focus', () => {
-  if (!lv.busy && !lvDialog.open) lvLoad();
+  if (!lv.busy && !lvDialog.open && Date.now() - (lv.loadedAt || 0) > 60000) lvLoad();
 });
 setInterval(() => {
   if (lvISO(new Date()) !== lv.today && !lv.busy && !lvDialog.open) lvLoad();
 }, 60000);
+// Contexto inicial: evita que el primer render lo tome como un cambio de rol y cargue dos veces.
+lv.role = state.role;
+lv.employeeContext = currentEmployeeId();
 lvLoad();
 
 const lvViewer = document.createElement('dialog');

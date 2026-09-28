@@ -59,6 +59,9 @@ def native():
         c.execute("SET statement_timeout TO '30s'")
         c.execute("SET lock_timeout TO '15s'")
         c.commit()
+        # Lecturas sin transacción: con Supabase remoto cada COMMIT cuesta ~200 ms de ida y vuelta.
+        # Las escrituras abren una transacción explícita en Connection.lock().
+        c.autocommit = True
     return c
 
 
@@ -73,6 +76,20 @@ def ensure_ready():
 
 def connect():
     return Connection(native())
+
+
+def warm(count=6):
+    """Abre conexiones en paralelo al iniciar: cada conexión nueva a Supabase tarda ~3 s y la
+    primera carga de la aplicación hace varias peticiones simultáneas."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(count) as pool:
+        opened = list(pool.map(lambda _: native(), range(count)))
+    for raw in opened:
+        try:
+            _pool.put_nowait(raw)
+        except queue.Full:
+            raw.close()
 
 
 def other_active_admin(connection, excluded):
@@ -175,12 +192,19 @@ class Connection:
             _active.reset(self.token)
             self.close()
 
+    def in_transaction(self):
+        from psycopg.pq import TransactionStatus
+
+        return self.raw.info.transaction_status != TransactionStatus.IDLE
+
     def commit(self):
-        self.raw.commit()
+        if self.locked:
+            self.raw.execute("COMMIT")
         self.locked = False
 
     def rollback(self):
-        self.raw.rollback()
+        if self.in_transaction():
+            self.raw.execute("ROLLBACK")
         self.locked = False
 
     def close(self):
@@ -188,17 +212,31 @@ class Connection:
             return
         self.closed = True
         try:
-            self.raw.rollback()
+            if self.in_transaction():
+                self.raw.execute("ROLLBACK")
             _pool.put_nowait(self.raw)
         except Exception:
             self.raw.close()
 
     def lock(self):
+        # Primera escritura: abre la transacción y toma el bloqueo en un solo viaje a la base.
         if not self.locked:
             self.raw.execute(
-                "SELECT pg_advisory_xact_lock(hashtextextended(current_schema()||':writes',0))"
+                "BEGIN; SELECT pg_advisory_xact_lock(hashtextextended(current_schema()||':writes',0))"
             )
             self.locked = True
+
+    def select_many(self, queries):
+        """Varias lecturas en un solo viaje a la base (modo pipeline de PostgreSQL)."""
+        from psycopg.rows import dict_row
+
+        cursors = []
+        with self.raw.pipeline():
+            for query, params in queries:
+                cursor = self.raw.cursor(row_factory=dict_row)
+                cursor.execute(translate(query.strip().rstrip(";")), tuple(params))
+                cursors.append(cursor)
+        return [[Row(row) for row in cursor.fetchall()] for cursor in cursors]
 
     def execute(self, query, params=()):
         import psycopg

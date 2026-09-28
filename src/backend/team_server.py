@@ -45,6 +45,7 @@ CATALOG = {
 ACCESS_ROLES = ["Empleado", "Supervisor", "Administrador"]
 ASSET_PHOTOS = ["assets/avatars/" + p.name for p in (ROOT / "src/assets/avatars").glob("*.png")]
 CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; frame-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+STATIC_SUFFIXES = {".js", ".css", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico", ".woff2"}
 IMAGE_FORMATS = {
     "PNG": ("image/png", ".png"),
     "JPEG": ("image/jpeg", ".jpg"),
@@ -89,6 +90,15 @@ class Connection(sqlite3.Connection):
             return super().__exit__(*args)
         finally:
             self.close()
+
+
+def select_many(c, *queries):
+    """Varias lecturas en un solo viaje a la base: pipeline en PostgreSQL, secuencial en SQLite.
+    Cada consulta es un SQL o una tupla (SQL, parámetros)."""
+    queries = [(q, ()) if isinstance(q, str) else q for q in queries]
+    if hasattr(c, "select_many"):
+        return c.select_many(queries)
+    return [c.execute(q, p).fetchall() for q, p in queries]
 
 
 def connect():
@@ -315,7 +325,11 @@ class Handler(SimpleHTTPRequestHandler):
         return None
 
     def end_headers(self):
-        self.send_header("Cache-Control", "no-store")
+        # Recursos estáticos: revalidación (304 si no cambiaron). API y HTML: nunca en caché,
+        # para que tras cerrar sesión el botón Atrás no muestre datos privados.
+        path = urlparse(self.path).path
+        static = not path.startswith("/api/") and Path(path).suffix in STATIC_SUFFIXES
+        self.send_header("Cache-Control", "no-cache" if static else "no-store")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "same-origin")
         self.send_header("X-Content-Type-Options", "nosniff")
@@ -543,6 +557,9 @@ class Handler(SimpleHTTPRequestHandler):
                 result = unpack(
                     c.execute("SELECT * FROM employees WHERE id=?", (employee_id,)).fetchone()
                 )
+            import auth
+
+            auth.forget_sessions()  # El estado laboral del empleado condiciona su acceso.
             self.send_json(201 if create else 200, {"employee": result})
         except Validation as e:
             self.send_json(e.status, {"errors": e.fields})
