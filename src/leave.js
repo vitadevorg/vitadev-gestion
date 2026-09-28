@@ -432,6 +432,28 @@ document.addEventListener('submit', async (e) => {
   if (e.target.id !== 'lv-form') return;
   e.preventDefault();
   if (lv.busy || Object.keys(lvValidate()).length) return;
+  const d = lv.draft,
+    days = lvDays(d.start, d.end),
+    admin = state.role === 'admin';
+  const ok = await confirmAction({
+    title: '¿Enviar la solicitud de licencia?',
+    message: admin
+      ? `Se registrará en nombre de ${lvPerson(d.employee)?.name || 'el empleado'}.`
+      : 'Se enviará a Administración para su aprobación.',
+    details: [
+      ['Tipo', d.type],
+      ['Período', crDate(d.start) + ' → ' + crDate(d.end)],
+      ['Duración', days + (days === 1 ? ' día corrido' : ' días corridos')],
+      ['Adjunto', d.attachmentName || ''],
+    ],
+    notes: [
+      ...(d.start < lv.today ? ['La fecha de inicio ya pasó.'] : []),
+      ...(days > 15 ? ['Es una licencia de más de 15 días.'] : []),
+      'Quedará pendiente hasta que Administración la apruebe o rechace.',
+    ],
+    confirmLabel: 'Sí, enviar',
+  });
+  if (!ok) return;
   lv.busy = true;
   lvErrors();
   try {
@@ -441,7 +463,7 @@ document.addEventListener('submit', async (e) => {
     lv.busy = false;
     lvClose();
     render();
-    toast('Solicitud de licencia enviada');
+    notify('success', 'Solicitud de licencia enviada', 'Podés seguir su estado en Licencias.');
   } catch (err) {
     lv.busy = false;
     lv.errors = err.errors || { _form: 'No se pudo guardar. Tus datos se conservan.' };

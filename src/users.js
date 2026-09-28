@@ -168,10 +168,51 @@ document.addEventListener('change', (e) => {
       e.target.value === 'ADMIN' ? 'ADMINISTRATOR' : 'EMPLOYEE';
   if (e.target.closest('#access-form')) accessValidate();
 });
+// El backend revoca las sesiones de la cuenta si cambian credenciales, identidad o permisos.
+function accessConfirmSave(d) {
+  const label = (code) => access.policy?.profileLabels?.[code] || code;
+  const original = d.id ? access.users.find((u) => u.id === d.id) : null;
+  if (!original)
+    return confirmAction({
+      title: '¿Crear el acceso?',
+      message: 'La persona podrá ingresar a VitaDev con este correo y la contraseña definida.',
+      details: [
+        ['Correo', d.email],
+        ['Perfil', label(d.permissionProfile)],
+        ['Estado', d.status === 'ACTIVE' ? 'Activo' : 'Deshabilitado'],
+      ],
+      notes: ['Comunicale la contraseña inicial por un canal privado: VitaDev no envía correos.'],
+      confirmLabel: 'Sí, crear acceso',
+    });
+  const revokes =
+    !!d.password ||
+    ['email', 'role', 'status', 'permissionProfile'].some((k) => d[k] !== original[k]);
+  if (!revokes) return Promise.resolve(true);
+  const changes = [
+    d.email !== original.email && 'correo',
+    d.permissionProfile !== original.permissionProfile &&
+      `perfil (${label(original.permissionProfile)} → ${label(d.permissionProfile)})`,
+    d.status !== original.status && (d.status === 'ACTIVE' ? 'reactivación' : 'desactivación'),
+    d.password && 'contraseña',
+  ].filter(Boolean);
+  const self = original.id === authSession?.userId;
+  return confirmAction({
+    tone: d.status !== 'ACTIVE' ? 'danger' : 'warning',
+    title: '¿Guardar los cambios de acceso?',
+    message: `Cambios: ${changes.join(', ')}.`,
+    notes: [
+      self
+        ? 'Es tu propia cuenta: se cerrará tu sesión y deberás volver a ingresar.'
+        : `Se cerrarán las sesiones abiertas de ${accessName(original)}.`,
+    ],
+    confirmLabel: 'Sí, guardar',
+  });
+}
 document.addEventListener('submit', async (e) => {
   if (e.target.id !== 'access-form') return;
   e.preventDefault();
   if (access.busy || Object.keys(accessValidate()).length) return;
+  if (!(await accessConfirmSave(access.draft))) return;
   access.busy = true;
   accessValidate();
   try {
@@ -213,24 +254,30 @@ document.addEventListener('click', async (e) => {
   }
   if (op === 'toggle' && can('users.manage')) {
     const enable = u.status !== 'ACTIVE';
-    modal(
-      enable ? 'Reactivar acceso' : `¿Desactivar el acceso de ${esc(accessName(u))}?`,
-      `<p>${enable ? 'La cuenta volverá a poder iniciar sesión si cumple las condiciones de acceso.' : `${esc(accessName(u))} ya no podrá ingresar a VitaDev. Su información y actividad histórica se conservarán.`}</p><p class="field-error" id="access-toggle-error" role="alert"></p><div class="form-actions"><button class="button" data-close>Cancelar</button><button class="button primary" id="access-toggle-confirm">${enable ? 'Reactivar acceso' : 'Desactivar acceso'}</button></div>`,
-    );
-    $('#access-toggle-confirm').onclick = async (event) => {
-      event.target.disabled = true;
-      try {
-        await authRequest('/api/users/' + id, { ...u, status: enable ? 'ACTIVE' : 'DISABLED' });
-        $('#modal').close();
-        await accessLoad();
-        toast('Estado de acceso actualizado.');
-      } catch (error) {
-        $('#access-toggle-error').textContent = Object.values(
-          error.errors || { _form: 'No se pudo actualizar.' },
-        ).join(' ');
-        event.target.disabled = false;
-      }
-    };
+    const ok = await confirmAction({
+      tone: enable ? 'info' : 'danger',
+      title: enable
+        ? `¿Reactivar el acceso de ${accessName(u)}?`
+        : `¿Desactivar el acceso de ${accessName(u)}?`,
+      message: enable
+        ? 'La cuenta volverá a poder iniciar sesión si cumple las condiciones de acceso.'
+        : 'Ya no podrá ingresar a VitaDev y se cerrarán sus sesiones abiertas. Su información y actividad histórica se conservan.',
+      confirmLabel: enable ? 'Sí, reactivar' : 'Sí, desactivar',
+      cancelLabel: 'Volver',
+    });
+    if (!ok) return;
+    try {
+      await authRequest('/api/users/' + id, { ...u, status: enable ? 'ACTIVE' : 'DISABLED' });
+      $('#modal').close();
+      await accessLoad();
+      notify('success', enable ? 'Acceso reactivado' : 'Acceso desactivado', accessName(u));
+    } catch (error) {
+      notify(
+        'error',
+        'No se pudo actualizar el acceso',
+        Object.values(error.errors || { _form: 'Volvé a intentar.' }).join(' '),
+      );
+    }
   }
 });
 $('#profile').onclick = () => {
@@ -252,6 +299,8 @@ $('#profile').onclick = () => {
   });
   $('#auth-logout').onclick = async (event) => {
     event.target.disabled = true;
+    event.target.classList.add('is-busy');
+    event.target.textContent = 'Cerrando sesión…';
     try {
       await authRequest('/api/auth/logout', {});
       authSession = null;
@@ -260,6 +309,8 @@ $('#profile').onclick = () => {
       location.replace('/login');
     } catch {
       event.target.disabled = false;
+      event.target.classList.remove('is-busy');
+      event.target.textContent = 'Cerrar sesión';
       toast('No se pudo cerrar la sesión. Revisá la conexión y volvé a intentar.');
     }
   };
@@ -267,6 +318,11 @@ $('#profile').onclick = () => {
 };
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') $('#authenticated-menu')?.remove();
+});
+// Tocar fuera del menú lo cierra (en celular no hay otra forma evidente de descartarlo).
+document.addEventListener('click', (e) => {
+  const menu = $('#authenticated-menu');
+  if (menu && !menu.contains(e.target) && !e.target.closest('#profile')) menu.remove();
 });
 if (can('users.view')) accessLoad();
 
