@@ -90,7 +90,20 @@ async function crApi(path = '', data, method = 'POST') {
   }
   return value;
 }
-async function crLoad(draw = true) {
+// Mesa de Ayuda también pide Clientes al iniciar: se comparte la carga inicial en curso en lugar
+// de duplicarla. Después de una modificación siempre se piden datos frescos.
+let crInitialLoad = null;
+function crLoad(draw = true) {
+  if (!crm.loaded && crInitialLoad)
+    return crInitialLoad.then((ok) => {
+      if (draw) render();
+      return ok;
+    });
+  const load = crFetch(draw);
+  if (!crm.loaded) crInitialLoad = load.finally(() => (crInitialLoad = null));
+  return load;
+}
+async function crFetch(draw) {
   try {
     const data = await crApi();
     crm.data = data;
@@ -150,7 +163,7 @@ function crList() {
       'owner',
       'Todos los responsables',
       employees.map((e) => [e.id, e.name]),
-    )}${crButton('Limpiar filtros', 'clear')}</div><div class="crm-list-meta"><span>${list.length} de ${crm.data.clients.length} clientes</span>${crButton('Exportar CSV', 'export')}</div><section class="panel table-panel">${crTable(
+    )}${crButton('Limpiar filtros', 'clear')}</div><div class="crm-list-meta"><span>${list.length} de ${crm.data.clients.length} clientes</span>${crButton('Exportar CSV', 'export')}</div><section class="panel table-panel crm-table-panel">${crTable(
       [
         'Cliente',
         'Estado',
@@ -158,13 +171,15 @@ function crList() {
         'Responsable VitaDev',
         'Solicitudes abiertas',
         'Próxima renovación',
-        'Acciones',
+        '<span class="sr-only">Acciones</span>',
       ],
       list.map((c) => {
         const p = crRelated('subscriptions', c.id)
           .filter((s) => s.status !== 'Finalizado')
           .map((s) => crProduct(s.productId)?.name || 'Producto archivado');
-        return `<tr><td><div class="person">${personImage(c, 'small', 'company')}<div><strong>${esc(c.name)}</strong><small>${esc([c.city, c.province].filter(Boolean).join(', '))}</small></div></div></td><td>${crBadge(c.status)}</td><td>${p.length ? esc(p[0]) + (p.length > 1 ? ` <span class="sub">+ ${p.length - 1} más</span>` : '') : '—'}</td><td>${crPerson(c.owner)}</td><td>${crTickets(c.id).filter(isOpen).length}</td><td>${crDate(crRenewal(c.id))}</td><td><div class="crm-actions"><button class="link" data-crm="profile" data-id="${c.id}">Ver cliente</button><button class="link" data-crm="edit-clients" data-id="${c.id}">Editar</button>${crMore('clients', c.id)}</div></td></tr>`;
+        // El nombre abre la ficha (accesible por teclado) y toda la fila también; las acciones
+        // secundarias quedan como botones de ícono del mismo tamaño.
+        return `<tr class="crm-row" data-crm-row="${c.id}"><td class="crm-cell-client"><div class="person">${personImage(c, 'small', 'company')}<div><button class="crm-name-link" data-crm="profile" data-id="${c.id}">${esc(c.name)}</button><small>${esc([c.city, c.province].filter(Boolean).join(', '))}</small></div></div></td><td class="crm-cell-status">${crBadge(c.status)}</td><td class="crm-cell-products">${p.length ? esc(p[0]) + (p.length > 1 ? ` <span class="sub">+ ${p.length - 1} más</span>` : '') : '—'}</td><td class="crm-cell-owner">${crPerson(c.owner)}</td><td class="crm-cell-open"><span class="crm-count" title="Solicitudes abiertas">${crTickets(c.id).filter(isOpen).length}</span></td><td class="crm-cell-renewal">${crDate(crRenewal(c.id))}</td><td class="crm-cell-actions"><div class="crm-row-actions"><button class="icon-action" data-crm="edit-clients" data-id="${c.id}" aria-label="Editar ${esc(c.name)}" title="Editar">${ico('edit')}</button>${crMore('clients', c.id)}</div></td></tr>`;
       }),
     )}</section>`
   );
@@ -1160,4 +1175,10 @@ document.addEventListener('click', (event) =>
     if (!m.contains(event.target)) m.open = false;
   }),
 );
+// Clic en cualquier parte de la fila abre la ficha (los controles internos mantienen su acción).
+document.addEventListener('click', (event) => {
+  const row = event.target.closest('[data-crm-row]');
+  if (!row || event.target.closest('button, a, input, select, label, details')) return;
+  row.querySelector('[data-crm="profile"]')?.click();
+});
 crLoad();

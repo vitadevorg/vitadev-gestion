@@ -46,6 +46,14 @@ def get(c, id):
     return {**json.loads(r["payload"]), "id": r["id"], "version": r["version"]} if r else None
 
 
+def all_requests(c):
+    """Todas las solicitudes en una consulta, en lugar de una lectura por solicitud."""
+    return [
+        {**json.loads(r["payload"]), "id": r["id"], "version": r["version"]}
+        for r in c.execute("SELECT * FROM desk_requests ORDER BY id DESC")
+    ]
+
+
 def event(c, id, action, reference=""):
     c.execute(
         "INSERT INTO desk_events(request_id,action,reference,actor,created_at) VALUES(?,?,?,?,?)",
@@ -246,26 +254,28 @@ class Handler(crm.Handler):
             self.guard()
             with crm.connect() as c:
                 if path == "/api/desk":
+                    requests, tasks, events, comments, files = team.select_many(
+                        c,
+                        "SELECT * FROM desk_requests ORDER BY id DESC",
+                        "SELECT * FROM desk_tasks",
+                        "SELECT * FROM desk_events ORDER BY id DESC",
+                        "SELECT * FROM desk_comments ORDER BY id",
+                        "SELECT * FROM desk_files",
+                    )
                     return self.send_json(
                         200,
                         {
                             "requests": [
-                                get(c, r["id"])
-                                for r in c.execute("SELECT id FROM desk_requests ORDER BY id DESC")
+                                {**json.loads(r["payload"]), "id": r["id"], "version": r["version"]}
+                                for r in requests
                             ],
-                            "tasks": [
-                                {**json.loads(r["payload"]), "id": r["id"]}
-                                for r in c.execute("SELECT * FROM desk_tasks")
-                            ],
-                            "events": [
-                                dict(r)
-                                for r in c.execute("SELECT * FROM desk_events ORDER BY id DESC")
-                            ],
+                            "tasks": [{**json.loads(r["payload"]), "id": r["id"]} for r in tasks],
+                            "events": [dict(r) for r in events],
                             "comments": [
                                 {**dict(r), "attachments": json.loads(r["attachments"])}
-                                for r in c.execute("SELECT * FROM desk_comments ORDER BY id")
+                                for r in comments
                             ],
-                            "files": [dict(r) for r in c.execute("SELECT * FROM desk_files")],
+                            "files": [dict(r) for r in files],
                             "states": STATES,
                             "priorities": PRIORITIES,
                             "types": TYPES,

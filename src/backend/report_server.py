@@ -43,24 +43,39 @@ def sources(repository=None):
     if repository is not None:
         return repository.report_sources()
     with crm.connect() as c:
-        data = {k: crm.rows(c, k) for k in crm.KINDS}
-        data["importedClients"] = {
-            r["client_id"]
-            for r in c.execute(
-                "SELECT client_id FROM activity WHERE action='Registro inicial importado'"
-            )
-        }
-        data["requests"] = [desk.get(c, r["id"]) for r in c.execute("SELECT id FROM desk_requests")]
-        data["events"] = [dict(r) for r in c.execute("SELECT * FROM desk_events ORDER BY id")]
-        data["tasks"] = [
-            {**json.loads(r["payload"]), "id": r["id"]}
-            for r in c.execute("SELECT * FROM desk_tasks")
-        ]
-    c = team.connect()
-    try:
+        pg = team.pg.enabled()
+        # PostgreSQL: todas las fuentes en un solo viaje. SQLite: tres archivos separados.
+        results = team.select_many(
+            c,
+            "SELECT * FROM records ORDER BY id",
+            "SELECT client_id FROM activity WHERE action='Registro inicial importado'",
+            "SELECT * FROM desk_requests",
+            "SELECT * FROM desk_events ORDER BY id",
+            "SELECT * FROM desk_tasks",
+            *(["SELECT * FROM employees", "SELECT * FROM absences"] if pg else []),
+        )
+    records, imported, requests, events, tasks = results[:5]
+    data = {kind: [] for kind in crm.KINDS}
+    for r in records:
+        data.setdefault(r["kind"], []).append(crm.decode(r))
+    data["importedClients"] = {r["client_id"] for r in imported}
+    data["requests"] = [
+        {**json.loads(r["payload"]), "id": r["id"], "version": r["version"]} for r in requests
+    ]
+    data["events"] = [dict(r) for r in events]
+    data["tasks"] = [{**json.loads(r["payload"]), "id": r["id"]} for r in tasks]
+    if pg:
+        employees, absences = results[5:]
+    else:
+        with team.connect() as c:
+            employees = c.execute("SELECT * FROM employees").fetchall()
+        with leave.connect() as c:
+            absences = c.execute("SELECT * FROM absences").fetchall()
+    data["employees"] = [team.unpack(r) for r in employees]
+    data["leaves"] = [leave.decode(r) for r in absences]
+    return data
+    with team.connect() as c:
         data["employees"] = [team.unpack(r) for r in c.execute("SELECT * FROM employees")]
-    finally:
-        c.close()
     with leave.connect() as c:
         data["leaves"] = [leave.decode(r) for r in c.execute("SELECT * FROM absences")]
     return data

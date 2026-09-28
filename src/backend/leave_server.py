@@ -225,23 +225,19 @@ class Handler(desk.Handler):
                     )
                 ctx = context(self)
                 if path == "/api/absences":
-                    items = [
-                        decode(r)
-                        for r in c.execute("SELECT * FROM absences ORDER BY start DESC,id DESC")
-                    ]
-                    items = [r for r in items if permitted(ctx, r)]
+                    absences, event_rows, files = team.select_many(
+                        c,
+                        "SELECT * FROM absences ORDER BY start DESC,id DESC",
+                        "SELECT * FROM absence_events ORDER BY id DESC",
+                        "SELECT * FROM absence_files",
+                    )
+                    items = [r for r in map(decode, absences) if permitted(ctx, r)]
                     ids = {r["id"] for r in items}
+                    names = {f["id"]: f["name"] for f in files}
                     for r in items:
                         if r["attachment"]:
-                            f = c.execute(
-                                "SELECT name FROM absence_files WHERE id=?", (r["attachment"],)
-                            ).fetchone()
-                            r["attachmentName"] = f["name"] if f else "Adjunto"
-                    events = [
-                        dict(r)
-                        for r in c.execute("SELECT * FROM absence_events ORDER BY id DESC")
-                        if r["absence_id"] in ids
-                    ]
+                            r["attachmentName"] = names.get(r["attachment"], "Adjunto")
+                    events = [dict(r) for r in event_rows if r["absence_id"] in ids]
                     return self.send_json(
                         200,
                         {

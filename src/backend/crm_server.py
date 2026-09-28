@@ -71,6 +71,14 @@ def rows(c, kind):
     return [decode(r) for r in c.execute("SELECT * FROM records WHERE kind=? ORDER BY id", (kind,))]
 
 
+def rows_by_kind(c):
+    """Todos los registros agrupados por tipo en una sola consulta (cada consulta remota cuesta ~200 ms)."""
+    grouped = {kind: [] for kind in KINDS}
+    for r in c.execute("SELECT * FROM records ORDER BY id"):
+        grouped.setdefault(r["kind"], []).append(decode(r))
+    return grouped
+
+
 def decode(r):
     return {**json.loads(r["payload"]), "id": r["id"], "version": r["version"]}
 
@@ -422,14 +430,20 @@ class Handler(team.Handler):
             self.guard()
             with connect() as c:
                 if path == "/api/crm":
+                    records, activity = team.select_many(
+                        c,
+                        "SELECT * FROM records ORDER BY id",
+                        "SELECT * FROM activity ORDER BY id DESC",
+                    )
+                    grouped = {kind: [] for kind in KINDS}
+                    for r in records:
+                        if r["kind"] in grouped:
+                            grouped[r["kind"]].append(decode(r))
                     return self.send_json(
                         200,
                         {
-                            **{k: rows(c, k) for k in KINDS},
-                            "activity": [
-                                dict(r)
-                                for r in c.execute("SELECT * FROM activity ORDER BY id DESC")
-                            ],
+                            **grouped,
+                            "activity": [dict(r) for r in activity],
                             "options": OPTIONS,
                             "today": date.today().isoformat(),
                         },
