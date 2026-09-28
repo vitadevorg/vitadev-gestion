@@ -343,8 +343,63 @@ function teamClose() {
   teamDialog.innerHTML = '';
   if (team.returnFocus?.isConnected) team.returnFocus.focus();
 }
+const TEAM_FIELD_LABELS = {
+  firstName: 'Nombre',
+  lastName: 'Apellido',
+  dni: 'DNI',
+  legajo: 'Legajo',
+  email: 'Correo corporativo',
+  phone: 'Teléfono',
+  birthDate: 'Fecha de nacimiento',
+  hireDate: 'Fecha de ingreso',
+  area: 'Área',
+  role: 'Puesto',
+  managerId: 'Responsable directo',
+  modality: 'Modalidad de trabajo',
+  laborStatus: 'Estado laboral',
+  availability: 'Disponibilidad base',
+  photo: 'Fotografía',
+  skills: 'Habilidades',
+};
+// Advertencia previa al guardado: resumen del alta o lista de campos modificados.
+function teamConfirmSave(draft) {
+  const name = (draft.firstName + ' ' + draft.lastName).trim();
+  if (!draft.id)
+    return confirmAction({
+      title: `¿Dar de alta a ${name}?`,
+      message: 'Revisá los datos principales antes de crear el legajo.',
+      details: [
+        ['Legajo', draft.legajo],
+        ['Área', draft.area],
+        ['Puesto', draft.role],
+        ['Ingreso', teamDate(draft.hireDate)],
+        ['Correo', draft.email],
+      ],
+      notes: [
+        'El alta no crea una cuenta de acceso: se gestiona desde Usuarios y permisos.',
+        ...(draft.managerId ? [] : ['No tiene responsable directo asignado.']),
+      ],
+      confirmLabel: 'Sí, dar de alta',
+    });
+  const original = teamEmployee(draft.id) || {};
+  const changed = Object.keys(TEAM_FIELD_LABELS).filter(
+    (k) => JSON.stringify(draft[k] ?? '') !== JSON.stringify(original[k] ?? ''),
+  );
+  if (!changed.length) return Promise.resolve(true);
+  return confirmAction({
+    title: '¿Guardar los cambios?',
+    message: `Se actualizará la ficha de ${name}.`,
+    details: [['Campos modificados', changed.map((k) => TEAM_FIELD_LABELS[k]).join(', ')]],
+    notes:
+      draft.laborStatus !== original.laborStatus && draft.laborStatus === LABOR.INACTIVE
+        ? ['El estado laboral pasa a Inactivo: su acceso a VitaDev quedará deshabilitado.']
+        : [],
+    confirmLabel: 'Sí, guardar',
+  });
+}
 async function teamSave() {
   if (Object.keys(teamValidation()).length || team.saving || team.photoBusy) return;
+  if (!(await teamConfirmSave(team.draft))) return;
   team.saving = true;
   teamUpdateErrors();
   const draft = structuredClone(team.draft);
@@ -361,7 +416,8 @@ async function teamSave() {
     teamClose();
     team.profileId = null;
     render();
-    toast('Empleado guardado correctamente.');
+    if (draft.id) toast('Cambios guardados en la ficha de ' + employee.name + '.');
+    else celebrate('¡Empleado dado de alta!', `${employee.name} ya forma parte del equipo.`);
   } catch (error) {
     if (error.status === 409) await teamLoad();
     team.errors = error.errors || { _form: 'No se pudo guardar. Tus datos se conservaron.' };

@@ -808,6 +808,19 @@ dialog::backdrop {
   color: #fff;
   border-color: #3678df;
 }
+/* Los bordes claros fijos de .button y .danger brillan sobre superficies oscuras. */
+.dark .button:not(.primary, .danger, .fb-confirm-go) {
+  color: var(--ink);
+  border-color: var(--line);
+}
+.dark .button:not(.primary, .danger, .fb-confirm-go):hover {
+  background: var(--surface-muted);
+  border-color: #52647d;
+}
+.dark .danger {
+  color: var(--danger);
+  border-color: #7a3c45;
+}
 .dark .toolbar,
 .dark .column {
   background: #182638;

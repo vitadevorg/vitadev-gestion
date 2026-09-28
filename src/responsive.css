@@ -1,0 +1,114 @@
+/* Adaptación a celulares de diálogos y formularios de los módulos. Se carga al final para
+   prevalecer sobre los estilos de escritorio de cada módulo. */
+
+@media (max-width: 600px) {
+  /* Diálogos como hoja inferior de ancho completo: más espacio útil y alcance del pulgar. */
+  dialog#team-dialog.team-editor,
+  dialog#team-dialog.team-small-dialog,
+  dialog#leave-dialog,
+  dialog#desk-dialog,
+  dialog#crm-confirm-dialog,
+  dialog#modal {
+    width: 100%;
+    max-width: none;
+    max-height: 94dvh;
+    margin: auto 0 0;
+    border-width: 1px 0 0;
+    border-radius: 20px 20px 0 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  dialog#leave-dialog,
+  dialog#desk-dialog,
+  dialog#crm-confirm-dialog,
+  dialog#modal {
+    padding: 20px 18px 0;
+  }
+  dialog#team-dialog.team-small-dialog {
+    padding: 20px 18px 0;
+  }
+
+  /* Equipo: el editor recortaba el contenido (overflow: hidden) y el botón Guardar quedaba
+     inaccesible. Ahora desplaza el diálogo completo y el pie queda fijo abajo. */
+  dialog#team-dialog.team-editor {
+    overflow-y: auto;
+  }
+  #team-dialog .team-editor-layout {
+    max-height: none;
+    overflow: visible;
+  }
+  /* overflow: hidden anula position: sticky en el pie; clip conserva el recorte de las esquinas. */
+  .crm-form-shell {
+    overflow: clip;
+  }
+
+  /* Barras de acciones siempre visibles al final de diálogos y formularios largos. */
+  #team-dialog .team-dialog-footer,
+  #team-dialog .form-actions,
+  #leave-dialog .lv-dialog-actions,
+  #desk-dialog .crm-actions,
+  #crm-confirm-dialog .crm-actions,
+  #modal .form-actions,
+  .crm-form-footer,
+  .desk-new-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background: var(--surface);
+    box-shadow: 0 -10px 16px -12px #0a152650;
+  }
+  #leave-dialog .lv-dialog-actions,
+  #desk-dialog .crm-actions,
+  #crm-confirm-dialog .crm-actions,
+  #modal .form-actions,
+  #team-dialog .form-actions {
+    margin: 16px -18px 0;
+    padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
+  }
+  #team-dialog .team-dialog-footer,
+  .crm-form-footer,
+  .desk-new-footer {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
+  /* Pie compacto: las acciones en una fila que se reparte el ancho. */
+  #team-dialog .team-dialog-footer {
+    gap: 8px;
+    padding-top: 12px;
+  }
+  #team-dialog .team-dialog-footer .actions,
+  .crm-form-footer .crm-actions,
+  .desk-new-footer .crm-actions,
+  #leave-dialog .lv-dialog-actions,
+  #modal .form-actions,
+  #team-dialog .form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  #team-dialog .team-dialog-footer .actions .button,
+  .crm-form-footer .crm-actions .button,
+  .desk-new-footer .crm-actions .button,
+  #leave-dialog .lv-dialog-actions .button,
+  #modal .form-actions .button,
+  #team-dialog .form-actions .button {
+    flex: 1 1 120px;
+    min-height: 44px;
+  }
+  #team-save-hint:empty,
+  #crm-save-hint:empty,
+  #desk-save-hint:empty {
+    display: none;
+  }
+
+  /* Campos cómodos para el dedo; 16px evita el zoom automático de iOS al enfocar. */
+  dialog input:not([type='checkbox'], [type='radio'], [type='file']),
+  dialog select,
+  dialog textarea,
+  main input:not([type='checkbox'], [type='radio'], [type='file']),
+  main select,
+  main textarea {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}

@@ -110,23 +110,58 @@ body.auth-locked {
   opacity: 0.6;
   cursor: wait;
 }
+/* Dentro de la app: colores por token para que funcionen en modo claro y oscuro. */
 .user-menu {
   position: absolute;
   right: 24px;
   top: 64px;
   z-index: 50;
   width: 240px;
-  background: white;
-  border: 1px solid #d7e0ea;
-  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 12px;
   padding: 16px;
-  box-shadow: 0 8px 24px #152b4520;
+  box-shadow: 0 12px 32px #0a152640;
+}
+.user-menu strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.user-menu p {
+  margin: 2px 0 4px;
+  color: var(--muted);
+  font-size: 13px;
 }
 .user-menu button {
-  display: block;
+  display: flex;
+  justify-content: flex-start;
   width: 100%;
   text-align: left;
   margin-top: 10px;
+}
+.user-menu #auth-logout {
+  color: var(--danger);
+}
+.user-menu #auth-logout:hover {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+}
+.user-menu #auth-logout:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+@media (max-width: 600px) {
+  .user-menu {
+    position: fixed;
+    top: 72px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+  .user-menu button {
+    min-height: 44px;
+  }
 }
 .access-form {
   display: grid;
@@ -138,7 +173,7 @@ body.auth-locked {
   font-size: 13px;
 }
 .access-form .field-error {
-  color: #b42318;
+  color: var(--danger);
 }
 .users-tabs {
   display: flex;
@@ -152,8 +187,10 @@ body.auth-locked {
 }
 .users-toolbar input {
   padding: 10px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--line);
   border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
   max-width: 100%;
   width: 360px;
 }
@@ -162,7 +199,7 @@ body.auth-locked {
 }
 .access-summary {
   padding: 18px 0;
-  border-top: 1px solid #dfe5ee;
+  border-top: 1px solid var(--line);
   margin-top: 20px;
 }
 @media (max-width: 600px) {

@@ -126,20 +126,12 @@ function hdList() {
             desk.data.requests.some(hdCanView) ? hdBtn('Limpiar filtros', 'clear') : '',
           )
         : desk.mode === 'table'
-          ? `<section class="panel table-panel">${crTable(
-              [
-                'Solicitud',
-                'Cliente',
-                'Producto / servicio',
-                'Prioridad',
-                'Estado',
-                'Agente',
-                'Actualización',
-                'Acciones',
-              ],
+          ? `<section class="panel table-panel desk-table-panel">${crTable(
+              ['Solicitud', 'Cliente', 'Estado', 'Agente', '<span class="sr-only">Abrir</span>'],
               list.map(
                 (r) =>
-                  `<tr><td><button class="desk-title-link" data-desk="detail" data-id="${r.id}"><small>SOL-${r.id}</small><strong>${esc(r.title)}</strong></button></td><td><div class="person">${personImage(cr(r.clientId), 'small', 'company')}<span>${esc(cr(r.clientId)?.name)}</span></div></td><td>${esc(hdProduct(r))}</td><td>${hdBadge(r.priority)}</td><td>${hdBadge(r.status)}</td><td>${hdAgent(r.agentId)}</td><td><time datetime="${r.updatedAt}">${hdWhen(r.updatedAt)}</time></td><td>${hdBtn('Ver detalle', 'detail', r.id)}</td></tr>`,
+                  // Toda la fila abre el detalle; el título sigue siendo el control accesible por teclado.
+                  `<tr class="desk-row" data-desk-row="${r.id}"><td class="desk-cell-title"><button class="desk-title-link" data-desk="detail" data-id="${r.id}"><small>SOL-${r.id} · <time datetime="${r.updatedAt}">${hdWhen(r.updatedAt)}</time></small><strong>${esc(r.title)}</strong></button></td><td class="desk-cell-client"><div class="person">${personImage(cr(r.clientId), 'small', 'company')}<span>${esc(cr(r.clientId)?.name)}<small>${esc(hdProduct(r))}</small></span></div></td><td class="desk-cell-state"><div class="desk-badges">${hdBadge(r.status)}${hdBadge(r.priority)}</div></td><td class="desk-cell-agent">${hdAgent(r.agentId)}</td><td class="desk-cell-go" aria-hidden="true">›</td></tr>`,
               ),
             )}</section>`
           : `<div class="desk-board">${desk.data.states
@@ -481,6 +473,17 @@ document.addEventListener('click', async (event) => {
       hdAssign();
       break;
     case 'take':
+      if (
+        !(await confirmAction({
+          tone: 'info',
+          title: `¿Tomar SOL-${desk.id}?`,
+          message:
+            'Quedará asignada a vos y dejará de estar disponible en la cola para el resto de Soporte.',
+          confirmLabel: 'Sí, tomarla',
+          cancelLabel: 'Volver',
+        }))
+      )
+        break;
       desk.busy = true;
       b.disabled = true;
       try {
@@ -520,6 +523,12 @@ document.addEventListener('click', async (event) => {
       }
       break;
   }
+});
+// Clic en cualquier parte de la fila abre el detalle (los controles internos mantienen su acción).
+document.addEventListener('click', (event) => {
+  const row = event.target.closest('[data-desk-row]');
+  if (!row || event.target.closest('button, a, input, select, label')) return;
+  hdShow(row.dataset.deskRow);
 });
 document.addEventListener('input', (event) => {
   const el = event.target;
@@ -570,6 +579,25 @@ document.addEventListener('change', async (event) => {
     $('#desk-save-task').disabled = desk.busy || !el.value || !$('#dt-title').value.trim();
   if (el.dataset.deskUpload) await hdUpload(el);
   if (['desk-state', 'desk-priority'].includes(el.id) && hdEditable()) {
+    // Resolver o cerrar saca el caso de la atención activa y afecta Reportes: se confirma antes.
+    if (el.id === 'desk-state' && [REQUEST.RESOLVED, REQUEST.CLOSED].includes(el.value)) {
+      const closing = el.value === REQUEST.CLOSED;
+      const ok = await confirmAction({
+        title: closing ? `¿Cerrar SOL-${desk.id}?` : `¿Marcar SOL-${desk.id} como resuelta?`,
+        message: closing
+          ? 'La solicitud dejará de estar activa. Podrá reabrirse si el cliente vuelve a necesitarla.'
+          : 'Se registrará la fecha de resolución y contará en Reportes.',
+        notes: desk.data.tasks.some((t) => t.ticket === desk.id && !t.done)
+          ? ['Tiene tareas vinculadas sin completar.']
+          : [],
+        confirmLabel: closing ? 'Sí, cerrar' : 'Sí, resolver',
+        cancelLabel: 'Volver',
+      });
+      if (!ok) {
+        render(); // Restaura el valor anterior del selector.
+        return;
+      }
+    }
     desk.busy = true;
     el.disabled = true;
     try {
@@ -592,6 +620,33 @@ document.addEventListener('submit', async (event) => {
   if (desk.busy) return;
   const kind = event.target.id;
   if (kind === 'desk-new-form' && Object.keys(hdNewErrors()).length) return;
+  if (kind === 'desk-new-form') {
+    const d = desk.draft,
+      contact = crm.data.contacts.find((c) => c.id === d.contactId);
+    const ok = await confirmAction({
+      title: '¿Crear la solicitud?',
+      message: d.title,
+      details: [
+        ['Cliente', cr(d.clientId)?.name],
+        [
+          'Producto / servicio',
+          crProduct(crm.data.subscriptions.find((s) => s.id === d.subscriptionId)?.productId)?.name,
+        ],
+        ['Contacto', contact ? contact.firstName + ' ' + contact.lastName : ''],
+        ['Tipo', d.type],
+        ['Prioridad', d.priority],
+        ['Adjuntos', d.attachments.length ? d.attachments.length + ' archivo(s)' : ''],
+      ],
+      notes: [
+        'Ingresará a la cola de Mesa de Ayuda sin agente asignado.',
+        ...(d.priority === PRIORITY.URGENT
+          ? ['Prioridad urgente: aparecerá en las alertas de Reportes.']
+          : []),
+      ],
+      confirmLabel: 'Sí, crear solicitud',
+    });
+    if (!ok) return;
+  }
   desk.busy = true;
   try {
     if (kind === 'desk-new-form') {
@@ -602,7 +657,7 @@ document.addEventListener('submit', async (event) => {
       desk.draft = null;
       desk.busy = false;
       hdShow(result.request.id);
-      toast('Solicitud creada en Mesa de Ayuda');
+      celebrate(`¡SOL-${result.request.id} creada!`, 'Ya está en la cola de Mesa de Ayuda.');
       return;
     }
     if (kind === 'desk-comment-form') {

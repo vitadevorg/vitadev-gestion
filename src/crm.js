@@ -746,8 +746,92 @@ function crConfirm(kind, id) {
   crDialog.innerHTML = `<h2 id="crm-confirm-title">${kind === 'contacts' ? 'Desactivar contacto' : kind === 'contracts' ? 'Finalizar contrato' : 'Finalizar relación comercial'}</h2><p>${esc(r.name || r.number || r.firstName + ' ' + r.lastName)}</p><p>Se conservarán todos los registros y el historial.${kind === 'clients' ? ' Los contratos y contrataciones conservarán sus estados; revisalos por separado.' : ''}</p><p class="field-error" role="alert" id="crm-confirm-error"></p><div class="crm-actions"><button class="button" data-crm="close-confirm">Cancelar</button><button class="button primary" data-crm="confirm-finish">Confirmar</button></div>`;
   crDialog.showModal();
 }
+const CR_KIND_LABELS = {
+  clients: 'cliente',
+  contacts: 'contacto',
+  catalog: 'producto/servicio',
+  subscriptions: 'contratación',
+  contracts: 'contrato',
+};
+// Advertencia previa: resumen de lo que se crea (con sus consecuencias) o confirmación de edición.
+function crConfirmSave(kind, d) {
+  const label = CR_KIND_LABELS[kind],
+    client = cr(d.clientId)?.name,
+    name =
+      d.name ||
+      d.number ||
+      (d.firstName ? d.firstName + ' ' + d.lastName : '') ||
+      crProduct(d.productId)?.name ||
+      label;
+  const previous = d.id ? crm.data[kind]?.find((r) => r.id === d.id) : null;
+  const finishing = d.status === 'Finalizado' && previous?.status !== 'Finalizado';
+  if (d.id)
+    return confirmAction({
+      tone: finishing ? 'danger' : 'warning',
+      title: finishing ? `¿Finalizar ${name}?` : '¿Guardar los cambios?',
+      message: finishing
+        ? 'Quedará registrado como finalizado y no admitirá nuevas relaciones comerciales.'
+        : `Se actualizará ${label === 'contratación' ? 'la' : 'el'} ${label} ${name}.`,
+      notes:
+        kind === 'contacts' && d.principal
+          ? ['Pasará a ser el contacto principal: el anterior dejará de serlo.']
+          : [],
+      confirmLabel: finishing ? 'Sí, finalizar' : 'Sí, guardar',
+    });
+  const details = {
+    clients: [
+      ['Razón social', d.legalName],
+      ['CUIT', d.cuit],
+      ['Estado', d.status],
+      ['Responsable', crEmployee(d.owner)?.name],
+      [
+        'Contacto principal',
+        [d.primaryContact?.firstName, d.primaryContact?.lastName].join(' ').trim(),
+      ],
+    ],
+    contacts: [
+      ['Cliente', client],
+      ['Correo', d.email],
+      ['Cargo', d.position],
+    ],
+    catalog: [
+      ['Tipo', d.type],
+      ['Planes', (d.plans || []).join(', ')],
+    ],
+    subscriptions: [
+      ['Cliente', client],
+      ['Plan', d.plan],
+      ['Inicio', crDate(d.start)],
+      ['Estado', d.status],
+    ],
+    contracts: [
+      ['Cliente', client],
+      ['Vigencia', crDate(d.start) + ' → ' + crDate(d.end)],
+      ['Importe', d.amount === '' ? '' : `${d.currency} ${d.amount}`],
+      ['Renovación', d.renewal],
+    ],
+  }[kind];
+  const notes = {
+    clients: ['El CUIT no podrá repetirse en otro cliente.'],
+    contacts: d.principal ? ['Será el contacto principal del cliente.'] : [],
+    catalog: ['Los planes y opciones que usen contrataciones no podrán quitarse después.'],
+    subscriptions: ['El producto de una contratación no puede cambiarse una vez creada.'],
+    contracts: [
+      'El cliente del contrato no puede cambiarse después.',
+      ...(d.document ? [] : ['No adjuntaste el PDF del contrato.']),
+    ],
+  }[kind];
+  return confirmAction({
+    title: `¿Crear ${label === 'contratación' ? 'la' : 'el'} ${label} ${name}?`,
+    message: 'Revisá los datos antes de registrarlo.',
+    details,
+    notes,
+    confirmLabel: 'Sí, crear',
+  });
+}
 async function crSave() {
   if (crm.busy || Object.keys(crValidate()).length) return;
+  if (!(await crConfirmSave(crm.form.kind, crm.form.d))) return;
   crm.busy = true;
   crUpdateErrors();
   const { kind, d } = crm.form;
@@ -767,9 +851,18 @@ async function crSave() {
       }[kind] || 'Resumen';
     await crLoad(false);
     render();
-    toast(
-      `${{ clients: 'Cliente', contacts: 'Contacto', catalog: 'Producto/servicio', subscriptions: 'Contratación', contracts: 'Contrato' }[kind]} ${wasEdit ? 'actualizado' : 'creado'} correctamente`,
-    );
+    const title = {
+      clients: 'Cliente',
+      contacts: 'Contacto',
+      catalog: 'Producto/servicio',
+      subscriptions: 'Contratación',
+      contracts: 'Contrato',
+    }[kind];
+    const female = kind === 'subscriptions';
+    if (wasEdit) toast(`${title} ${female ? 'actualizada' : 'actualizado'} correctamente`);
+    else if (kind === 'clients' || kind === 'contracts')
+      celebrate(`¡${title} ${female ? 'creada' : 'creado'}!`, 'Ya podés verlo en su ficha.');
+    else toast(`${title} ${female ? 'creada' : 'creado'} correctamente`);
   } catch (e) {
     crm.busy = false;
     if (e.status === 409) await crLoad(false);

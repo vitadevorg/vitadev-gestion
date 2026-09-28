@@ -5,17 +5,30 @@ const can = (permission) => !!authSession?.permissions.includes(permission);
 const authFetch = window.fetch.bind(window);
 window.fetch = async function (input, options = {}) {
   const url = new URL(typeof input === 'string' ? input : input.url, location.href);
+  const method = (options.method || 'GET').toUpperCase();
+  let done = null;
   if (url.origin === location.origin && url.pathname.startsWith('/api/')) {
     const headers = new Headers(options.headers || {});
     if (authSession?.csrfToken) headers.set('X-CSRF-Token', authSession.csrfToken);
     options = { ...options, headers, cache: 'no-store' };
+    // Escrituras y PDF muestran progreso (feedback.js); el login tiene su propio estado.
+    if (
+      typeof uiProgress !== 'undefined' &&
+      !url.pathname.startsWith('/api/auth/') &&
+      (method !== 'GET' || url.pathname.endsWith('/pdf'))
+    )
+      done = uiProgress.start(url.pathname, method);
   }
-  const response = await authFetch(input, options);
-  if (response.status === 401 && authLoaded && url.pathname !== '/api/auth/login') {
-    authSession = null;
-    location.replace('/login');
+  try {
+    const response = await authFetch(input, options);
+    if (response.status === 401 && authLoaded && url.pathname !== '/api/auth/login') {
+      authSession = null;
+      location.replace('/login');
+    }
+    return response;
+  } finally {
+    done?.();
   }
-  return response;
 };
 const authEscape = (s) =>
   String(s ?? '').replace(
@@ -103,6 +116,7 @@ async function authStart() {
   }
   const scripts = [
     'app.js',
+    'feedback.js',
     'employee.js',
     'interface.js',
     'team.js',
